@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
-import { Home, Calendar, BookOpen, ShoppingBag, Pill, User, Package, LogOut } from "lucide-react";
+import { Home, Calendar, BookOpen, ShoppingBag, Pill, User, Package, LogOut, Heart } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 
@@ -39,6 +39,15 @@ const AppLayout = () => {
               variant="ghost"
               size="icon"
               className="h-8 w-8"
+              onClick={() => navigate("/digestion")}
+              title="Digestión"
+            >
+              <Heart className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
               onClick={() => navigate("/suplementos")}
               title="Suplementos"
             >
@@ -74,6 +83,7 @@ const AppLayout = () => {
             </NavLink>
           ))}
           <NavLink to="/suplementos" className={linkClass}>Suplem.</NavLink>
+          <NavLink to="/digestion" className={linkClass}>Digestión</NavLink>
           <NavLink to="/perfil" className={linkClass}>Perfil</NavLink>
         </div>
       </nav>

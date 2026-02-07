@@ -53,6 +53,84 @@ export type Database = {
         }
         Relationships: []
       }
+      digestive_logs: {
+        Row: {
+          associated_meal: string | null
+          associated_recipe_id: string | null
+          created_at: string
+          id: string
+          log_date: string
+          log_time: string | null
+          notes: string | null
+          severity: number
+          symptom: string
+          user_id: string
+        }
+        Insert: {
+          associated_meal?: string | null
+          associated_recipe_id?: string | null
+          created_at?: string
+          id?: string
+          log_date?: string
+          log_time?: string | null
+          notes?: string | null
+          severity: number
+          symptom: string
+          user_id: string
+        }
+        Update: {
+          associated_meal?: string | null
+          associated_recipe_id?: string | null
+          created_at?: string
+          id?: string
+          log_date?: string
+          log_time?: string | null
+          notes?: string | null
+          severity?: number
+          symptom?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      digestive_profiles: {
+        Row: {
+          created_at: string
+          fiber_tolerance: string | null
+          gluten_sensitive: boolean | null
+          id: string
+          lactose_sensitive: boolean | null
+          notes: string | null
+          problem_foods: string[] | null
+          triggers: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          fiber_tolerance?: string | null
+          gluten_sensitive?: boolean | null
+          id?: string
+          lactose_sensitive?: boolean | null
+          notes?: string | null
+          problem_foods?: string[] | null
+          triggers?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          fiber_tolerance?: string | null
+          gluten_sensitive?: boolean | null
+          id?: string
+          lactose_sensitive?: boolean | null
+          notes?: string | null
+          problem_foods?: string[] | null
+          triggers?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           category: string
