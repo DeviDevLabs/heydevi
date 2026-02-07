@@ -1,1 +1,4 @@
 project_id = "xcctyhndssbjfmqciwhh"
+
+[functions.digestive-analysis]
+verify_jwt = false

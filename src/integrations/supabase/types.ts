@@ -55,39 +55,81 @@ export type Database = {
       }
       digestive_logs: {
         Row: {
+          alcohol: boolean | null
           associated_meal: string | null
           associated_recipe_id: string | null
+          bloating: number | null
+          bristol: number | null
+          coffee: boolean | null
           created_at: string
+          cycle_phase: string | null
+          energy: number | null
+          frequency: number | null
+          gas: number | null
           id: string
           log_date: string
           log_time: string | null
+          meds_notes: string | null
           notes: string | null
+          pain: number | null
+          reflux: number | null
           severity: number
+          sleep_hours: number | null
+          stress: number | null
           symptom: string
+          urgency: number | null
           user_id: string
         }
         Insert: {
+          alcohol?: boolean | null
           associated_meal?: string | null
           associated_recipe_id?: string | null
+          bloating?: number | null
+          bristol?: number | null
+          coffee?: boolean | null
           created_at?: string
+          cycle_phase?: string | null
+          energy?: number | null
+          frequency?: number | null
+          gas?: number | null
           id?: string
           log_date?: string
           log_time?: string | null
+          meds_notes?: string | null
           notes?: string | null
+          pain?: number | null
+          reflux?: number | null
           severity: number
+          sleep_hours?: number | null
+          stress?: number | null
           symptom: string
+          urgency?: number | null
           user_id: string
         }
         Update: {
+          alcohol?: boolean | null
           associated_meal?: string | null
           associated_recipe_id?: string | null
+          bloating?: number | null
+          bristol?: number | null
+          coffee?: boolean | null
           created_at?: string
+          cycle_phase?: string | null
+          energy?: number | null
+          frequency?: number | null
+          gas?: number | null
           id?: string
           log_date?: string
           log_time?: string | null
+          meds_notes?: string | null
           notes?: string | null
+          pain?: number | null
+          reflux?: number | null
           severity?: number
+          sleep_hours?: number | null
+          stress?: number | null
           symptom?: string
+          urgency?: number | null
           user_id?: string
         }
         Relationships: []
@@ -131,10 +173,82 @@ export type Database = {
         }
         Relationships: []
       }
+      food_experiments: {
+        Row: {
+          created_at: string
+          end_date: string | null
+          food_item_id: string
+          id: string
+          notes: string | null
+          start_date: string
+          target_dose: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          end_date?: string | null
+          food_item_id: string
+          id?: string
+          notes?: string | null
+          start_date?: string
+          target_dose?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string | null
+          food_item_id?: string
+          id?: string
+          notes?: string | null
+          start_date?: string
+          target_dose?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "food_experiments_food_item_id_fkey"
+            columns: ["food_item_id"]
+            isOneToOne: false
+            referencedRelation: "food_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      food_items: {
+        Row: {
+          canonical_name: string
+          category: string
+          created_at: string
+          default_unit: string
+          id: string
+          name: string
+          synonyms: string[] | null
+        }
+        Insert: {
+          canonical_name: string
+          category?: string
+          created_at?: string
+          default_unit?: string
+          id?: string
+          name: string
+          synonyms?: string[] | null
+        }
+        Update: {
+          canonical_name?: string
+          category?: string
+          created_at?: string
+          default_unit?: string
+          id?: string
+          name?: string
+          synonyms?: string[] | null
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           category: string
           created_at: string
+          food_item_id: string | null
           grams_available: number
           id: string
           ingredient_name: string
@@ -144,6 +258,7 @@ export type Database = {
         Insert: {
           category: string
           created_at?: string
+          food_item_id?: string | null
           grams_available?: number
           id?: string
           ingredient_name: string
@@ -153,10 +268,85 @@ export type Database = {
         Update: {
           category?: string
           created_at?: string
+          food_item_id?: string | null
           grams_available?: number
           id?: string
           ingredient_name?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_food_item_id_fkey"
+            columns: ["food_item_id"]
+            isOneToOne: false
+            referencedRelation: "food_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meal_log_items: {
+        Row: {
+          food_item_id: string
+          id: string
+          meal_log_id: string
+          qty: number
+          unit: string
+        }
+        Insert: {
+          food_item_id: string
+          id?: string
+          meal_log_id: string
+          qty?: number
+          unit?: string
+        }
+        Update: {
+          food_item_id?: string
+          id?: string
+          meal_log_id?: string
+          qty?: number
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_log_items_food_item_id_fkey"
+            columns: ["food_item_id"]
+            isOneToOne: false
+            referencedRelation: "food_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meal_log_items_meal_log_id_fkey"
+            columns: ["meal_log_id"]
+            isOneToOne: false
+            referencedRelation: "meal_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meal_logs: {
+        Row: {
+          created_at: string
+          id: string
+          logged_at: string
+          notes: string | null
+          tags: string[] | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          logged_at?: string
+          notes?: string | null
+          tags?: string[] | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          logged_at?: string
+          notes?: string | null
+          tags?: string[] | null
           user_id?: string
         }
         Relationships: []
@@ -206,6 +396,133 @@ export type Database = {
           updated_at?: string
           user_id?: string
           weight_kg?: number | null
+        }
+        Relationships: []
+      }
+      purchases: {
+        Row: {
+          created_at: string
+          food_item_id: string
+          id: string
+          purchased_at: string
+          qty: number
+          unit: string
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          created_at?: string
+          food_item_id: string
+          id?: string
+          purchased_at?: string
+          qty?: number
+          unit?: string
+          user_id: string
+          week_start?: string
+        }
+        Update: {
+          created_at?: string
+          food_item_id?: string
+          id?: string
+          purchased_at?: string
+          qty?: number
+          unit?: string
+          user_id?: string
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchases_food_item_id_fkey"
+            columns: ["food_item_id"]
+            isOneToOne: false
+            referencedRelation: "food_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplement_regimens: {
+        Row: {
+          created_at: string
+          dose_unit: string
+          dose_value: number
+          end_date: string | null
+          frequency: string
+          id: string
+          start_date: string
+          supplement_id: string
+          time_of_day: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dose_unit?: string
+          dose_value: number
+          end_date?: string | null
+          frequency?: string
+          id?: string
+          start_date: string
+          supplement_id: string
+          time_of_day?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dose_unit?: string
+          dose_value?: number
+          end_date?: string | null
+          frequency?: string
+          id?: string
+          start_date?: string
+          supplement_id?: string
+          time_of_day?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplement_regimens_supplement_id_fkey"
+            columns: ["supplement_id"]
+            isOneToOne: false
+            referencedRelation: "user_supplements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_supplements: {
+        Row: {
+          active: boolean
+          brand: string | null
+          created_at: string
+          default_unit: string | null
+          form: string | null
+          id: string
+          name: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          brand?: string | null
+          created_at?: string
+          default_unit?: string | null
+          form?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          brand?: string | null
+          created_at?: string
+          default_unit?: string | null
+          form?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
