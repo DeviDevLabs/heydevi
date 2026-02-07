@@ -38,7 +38,7 @@ const Inventory = () => {
   const [newGrams, setNewGrams] = useState("");
 
   const fetchInventory = useCallback(async () => {
-    if (!user) return;
+    if (!user) { setLoading(false); return; }
     const [{ data }, fi] = await Promise.all([
       supabase
         .from("inventory")

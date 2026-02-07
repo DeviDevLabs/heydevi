@@ -64,7 +64,7 @@ const DigestiveLog = () => {
   const [medsNotes, setMedsNotes] = useState("");
 
   const loadLogs = useCallback(async () => {
-    if (!user) return;
+    if (!user) { setLoading(false); return; }
     setLoading(true);
     const { data } = await supabase
       .from("digestive_logs")
