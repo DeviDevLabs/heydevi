@@ -1,4 +1,3 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -7,63 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-interface DigestiveLog {
-  log_date: string;
-  log_time: string | null;
-  bristol: number | null;
-  bloating: number;
-  pain: number;
-  gas: number;
-  reflux: number;
-  urgency: number;
-  energy: number | null;
-  stress: number | null;
-  alcohol: boolean;
-  coffee: boolean;
-  sleep_hours: number | null;
-  notes: string | null;
-}
-
-interface MealLogItem {
-  food_item_id: string;
-  qty: number;
-  food_item_name: string;
-}
-
-interface MealLog {
-  logged_at: string;
-  items: MealLogItem[];
-}
-
-/**
- * Compute a symptom score for a given log (0-25 scale).
- * Higher = worse.
- */
-function symptomScore(log: DigestiveLog): number {
-  const bristolPenalty = log.bristol
-    ? Math.abs(log.bristol - 4) * 2 // 4 is ideal
-    : 0;
-  return (
-    (log.bloating || 0) +
-    (log.pain || 0) +
-    (log.gas || 0) +
-    (log.reflux || 0) +
-    (log.urgency || 0) +
-    bristolPenalty
-  );
-}
-
-/**
- * Compute confounder weight: if stress high or alcohol, reduce weight of that day.
- */
-function dayWeight(log: DigestiveLog): number {
-  let w = 1.0;
-  if ((log.stress || 0) >= 4) w *= 0.5;
-  if (log.alcohol) w *= 0.5;
-  return w;
-}
-
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
