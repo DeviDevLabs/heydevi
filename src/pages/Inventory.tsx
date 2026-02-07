@@ -6,18 +6,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Minus, Trash2 } from "lucide-react";
+import { fetchFoodItems, findCanonicalMatch, type FoodItem } from "@/lib/foodUtils";
+import { Plus, Minus, Trash2, AlertTriangle } from "lucide-react";
 
 interface InventoryItem {
   id: string;
   ingredient_name: string;
   category: string;
   grams_available: number;
+  food_item_id: string | null;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
-  proteinas: "Proteinas",
-  lacteos: "Lacteos",
+  proteinas: "Proteínas",
+  lacteos: "Lácteos",
   verduras: "Verduras",
   frutas: "Frutas",
   granos: "Granos",
@@ -29,6 +31,7 @@ const Inventory = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState("");
   const [newCategory, setNewCategory] = useState("proteinas");
@@ -36,12 +39,16 @@ const Inventory = () => {
 
   const fetchInventory = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from("inventory")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("category", { ascending: true });
+    const [{ data }, fi] = await Promise.all([
+      supabase
+        .from("inventory")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("category", { ascending: true }),
+      fetchFoodItems(),
+    ]);
     setItems((data as InventoryItem[]) || []);
+    setFoodItems(fi);
     setLoading(false);
   }, [user]);
 
@@ -51,12 +58,17 @@ const Inventory = () => {
 
   const addItem = async () => {
     if (!user || !newName.trim() || !newGrams) return;
+    const match = findCanonicalMatch(newName.trim(), foodItems);
+    const canonicalName = match?.canonical_name || newName.trim();
+    const category = match?.category || newCategory;
+
     const { error } = await supabase.from("inventory").upsert(
       {
         user_id: user.id,
-        ingredient_name: newName.trim(),
-        category: newCategory,
+        ingredient_name: canonicalName,
+        category,
         grams_available: Number(newGrams),
+        food_item_id: match?.id || null,
       },
       { onConflict: "user_id,ingredient_name" }
     );
@@ -74,6 +86,12 @@ const Inventory = () => {
     if (!item) return;
     const newVal = Math.max(0, item.grams_available + delta);
     await supabase.from("inventory").update({ grams_available: newVal }).eq("id", id);
+    fetchInventory();
+  };
+
+  const markMissing = async (item: InventoryItem) => {
+    await supabase.from("inventory").update({ grams_available: 0 }).eq("id", item.id);
+    toast({ title: "Marcado como faltante", description: `${item.ingredient_name} ahora aparecerá en la lista de compras` });
     fetchInventory();
   };
 
@@ -140,6 +158,15 @@ const Inventory = () => {
                   <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => updateGrams(item.id, 50)}>
                     <Plus className="w-3 h-3" />
                   </Button>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="h-7 w-7 text-orange-600"
+                    onClick={() => markMissing(item)}
+                    title="Me falta"
+                  >
+                    <AlertTriangle className="w-3 h-3" />
+                  </Button>
                   <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteItem(item.id)}>
                     <Trash2 className="w-3 h-3" />
                   </Button>
@@ -152,7 +179,7 @@ const Inventory = () => {
 
       {items.length === 0 && (
         <p className="text-center text-muted-foreground text-sm py-8">
-          Tu inventario esta vacio. Agrega ingredientes para empezar a llevar control.
+          Tu inventario está vacío. Agrega ingredientes para empezar.
         </p>
       )}
     </div>
