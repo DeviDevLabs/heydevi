@@ -13,6 +13,9 @@ import ShoppingList from "@/pages/ShoppingList";
 import Supplements from "@/pages/Supplements";
 import Profile from "@/pages/Profile";
 import Inventory from "@/pages/Inventory";
+import DigestiveProfile from "@/pages/DigestiveProfile";
+import DigestiveLog from "@/pages/DigestiveLog";
+import DigestiveStats from "@/pages/DigestiveStats";
 import Auth from "@/pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -43,6 +46,9 @@ const AppRoutes = () => (
       <Route path="/suplementos" element={<Supplements />} />
       <Route path="/perfil" element={<Profile />} />
       <Route path="/inventario" element={<Inventory />} />
+      <Route path="/digestion" element={<DigestiveProfile />} />
+      <Route path="/digestion/registro" element={<DigestiveLog />} />
+      <Route path="/digestion/estadisticas" element={<DigestiveStats />} />
     </Route>
     <Route path="*" element={<NotFound />} />
   </Routes>

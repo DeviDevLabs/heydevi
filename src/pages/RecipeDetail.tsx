@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Clock } from "lucide-react";
+import { getDigestiveTags } from "@/lib/digestiveUtils";
+import DigestiveBadges from "@/components/nutrition/DigestiveBadges";
 
 const MULTIPLIERS = [0.5, 1, 1.5, 2];
 
@@ -101,6 +103,15 @@ const RecipeDetail = () => {
               </li>
             ))}
           </ol>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Perfil digestivo</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DigestiveBadges tags={getDigestiveTags(recipe)} />
         </CardContent>
       </Card>
 
