@@ -20,10 +20,7 @@ const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  if (user) {
-    navigate("/", { replace: true });
-    return null;
-  }
+  // If already logged in, allow navigating away but don't force redirect
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

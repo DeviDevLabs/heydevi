@@ -52,7 +52,7 @@ const Supplements = () => {
   const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
 
   const load = useCallback(async () => {
-    if (!user) return;
+    if (!user) { setLoading(false); return; }
     const [{ data: sups }, { data: regs }] = await Promise.all([
       supabase.from("user_supplements").select("*").eq("user_id", user.id).order("active", { ascending: false }),
       supabase.from("supplement_regimens").select("*").eq("user_id", user.id).order("start_date", { ascending: false }),

@@ -55,7 +55,7 @@ const ShoppingList = () => {
   }, []);
 
   const loadData = useCallback(async () => {
-    if (!user) return;
+    if (!user) { setLoading(false); return; }
     setLoading(true);
 
     const [items, purchaseData, { data: inventory }] = await Promise.all([
