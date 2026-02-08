@@ -29,10 +29,11 @@ const CATEGORY_LABELS: Record<string, string> = {
   granos: "Granos y cereales",
   semillas: "Semillas y grasas",
   condimentos: "Condimentos",
+  suplementos: "Suplementos",
 };
 
 const CATEGORY_ORDER = [
-  "proteinas", "lacteos", "verduras", "frutas", "granos", "semillas", "condimentos",
+  "proteinas", "lacteos", "verduras", "frutas", "granos", "semillas", "condimentos", "suplementos",
 ];
 
 const ShoppingList = () => {
@@ -49,18 +50,23 @@ const ShoppingList = () => {
     if (!user) { setLoading(false); return; }
     setLoading(true);
 
-    const [items, purchaseData, { data: inventory }] = await Promise.all([
+    const [items, purchaseData, { data: inventory }, { data: supInventory }] = await Promise.all([
       fetchFoodItems(),
       fetchRecentPurchases(user.id),
       supabase
         .from("inventory")
         .select("ingredient_name, grams_available, food_item_id")
         .eq("user_id", user.id),
+      supabase
+        .from("inventory")
+        .select("ingredient_name, grams_available, unit")
+        .eq("user_id", user.id)
+        .eq("item_type", "supplement")
+        .eq("grams_available", 0),
     ]);
 
     setFoodItems(items);
     const suggestions = computeSuggestedWeeklyQty(purchaseData);
-    // build index to prefer canonical names when generating shopping list
     const idx = buildFoodItemIndex(items as any);
     const raw = generateShoppingList(weeklyPlan, recipes, idx);
     const flat: { name: string; totalGrams: number; category: string }[] = [];
@@ -76,6 +82,28 @@ const ShoppingList = () => {
       items,
       suggestions
     );
+
+    // Add finished supplements that need repurchasing
+    if (supInventory?.length) {
+      for (const si of supInventory) {
+        const alreadyListed = computed.some(
+          (n) => n.foodItemName.toLowerCase() === si.ingredient_name.toLowerCase()
+        );
+        if (!alreadyListed) {
+          computed.push({
+            foodItemName: si.ingredient_name,
+            category: "suplementos",
+            needed: 1,
+            planRequired: 1,
+            unit: si.unit || "caps",
+            inventoryAvailable: 0,
+            foodItemId: null,
+            suggestedQty: null,
+          });
+        }
+      }
+    }
+
     setNeeds(computed);
     setLoading(false);
   }, [user]);
