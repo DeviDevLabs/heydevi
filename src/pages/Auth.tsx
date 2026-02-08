@@ -17,6 +17,8 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [liveMessage, setLiveMessage] = useState<string | null>(null);
+  const [liveVariant, setLiveVariant] = useState<"success" | "error" | null>(null);
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -38,6 +40,8 @@ const Auth = () => {
     }
 
     setSubmitting(true);
+    setLiveMessage(null);
+    setLiveVariant(null);
     try {
       if (isLogin) {
         const { error } = await signIn(emailResult.data, password);
@@ -46,6 +50,12 @@ const Auth = () => {
             ? "Correo o contrasena incorrectos"
             : error.message;
           toast({ title: "Error al iniciar sesion", description: msg, variant: "destructive" });
+          setLiveMessage(msg);
+          setLiveVariant("error");
+        } else {
+          const msg = "Sesion iniciada";
+          setLiveMessage(msg);
+          setLiveVariant("success");
         }
       } else {
         const { error } = await signUp(emailResult.data, password);
@@ -54,13 +64,24 @@ const Auth = () => {
             ? "Este correo ya esta registrado. Intenta iniciar sesion."
             : error.message;
           toast({ title: "Error al registrarse", description: msg, variant: "destructive" });
+          setLiveMessage(msg);
+          setLiveVariant("error");
         } else {
+          const successMsg = "Cuenta creada. Revisa tu correo para confirmar tu cuenta.";
           toast({
             title: "Cuenta creada",
             description: "Revisa tu correo para confirmar tu cuenta antes de iniciar sesion.",
           });
+          setLiveMessage(successMsg);
+          setLiveVariant("success");
         }
       }
+    } catch (err) {
+      console.error("Auth error", err);
+      const generic = "Error de red. Intenta nuevamente.";
+      toast({ title: "Error", description: generic, variant: "destructive" });
+      setLiveMessage(generic);
+      setLiveVariant("error");
     } finally {
       setSubmitting(false);
     }
@@ -92,6 +113,7 @@ const Auth = () => {
                   placeholder="tu@correo.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  disabled={submitting}
                   required
                 />
               </div>
@@ -103,16 +125,35 @@ const Auth = () => {
                   placeholder="Minimo 6 caracteres"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  disabled={submitting}
                   required
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={submitting}>
-                {submitting
-                  ? "Procesando..."
-                  : isLogin
-                  ? "Iniciar sesion"
-                  : "Crear cuenta"}
+              <Button type="submit" className="w-full" disabled={submitting} aria-busy={submitting}>
+                {submitting ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden>
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                    </svg>
+                    Procesando...
+                  </span>
+                ) : isLogin ? (
+                  "Iniciar sesion"
+                ) : (
+                  "Crear cuenta"
+                )}
               </Button>
+              {/* Live region for screen readers: polite for success, assertive for errors */}
+              {liveMessage && (
+                <div
+                  className={`mt-2 text-sm ${liveVariant === "error" ? "text-destructive" : "text-muted-foreground"}`}
+                  role="status"
+                  aria-live={liveVariant === "error" ? "assertive" : "polite"}
+                >
+                  {liveMessage}
+                </div>
+              )}
             </form>
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
@@ -134,7 +175,17 @@ const Auth = () => {
                 setSubmitting(false);
               }}
             >
-              Continuar con Google
+              {submitting ? (
+                <span className="flex items-center justify-center">
+                  <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden>
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                  </svg>
+                  Procesando...
+                </span>
+              ) : (
+                "Continuar con Google"
+              )}
             </Button>
             <div className="mt-4 text-center">
               <button
