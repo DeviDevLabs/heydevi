@@ -4,12 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, History, Edit } from "lucide-react";
 
+// ── Types ──────────────────────────────────────────────
 interface UserSupplement {
   id: string;
   name: string;
@@ -31,6 +31,85 @@ interface Regimen {
   time_of_day: string | null;
 }
 
+// ── Default supplements (source of truth) ──────────────
+type DefaultSup = {
+  key: string;
+  name: string;
+  form: string;
+  dose_value: number;
+  dose_unit: string;
+  frequency: string;
+  time_of_day?: string;
+  notes?: string;
+  inventory_initial_amount?: number;
+};
+
+const DEFAULT_SUPPLEMENTS: DefaultSup[] = [
+  {
+    key: "creatina",
+    name: "Creatina monohidrato",
+    form: "powder",
+    dose_value: 5,
+    dose_unit: "g",
+    frequency: "daily",
+    time_of_day: "07:00",
+    notes: "Post-entreno. Mezclar con agua o batido.",
+    inventory_initial_amount: 5,
+  },
+  {
+    key: "d3k2",
+    name: "Vitamina D3 + K2",
+    form: "caps",
+    dose_value: 2000,
+    dose_unit: "UI",
+    frequency: "daily",
+    notes: "Con desayuno. Incluye K2 100 mcg.",
+    inventory_initial_amount: 2000,
+  },
+  {
+    key: "b12",
+    name: "B12 metilcobalamina",
+    form: "caps",
+    dose_value: 1000,
+    dose_unit: "mcg",
+    frequency: "mon-wed-fri",
+    notes: "Por la mañana. Esencial en dieta vegetariana.",
+    inventory_initial_amount: 1000,
+  },
+  {
+    key: "omega3",
+    name: "Omega-3 de algas (DHA+EPA)",
+    form: "caps",
+    dose_value: 500,
+    dose_unit: "mg",
+    frequency: "daily",
+    notes: "Con desayuno. Rango 250–500 mg.",
+    inventory_initial_amount: 500,
+  },
+  {
+    key: "vitc",
+    name: "Vitamina C",
+    form: "caps",
+    dose_value: 500,
+    dose_unit: "mg",
+    frequency: "daily",
+    notes: "Media mañana o comida. Evitar justo antes/después del entreno.",
+    inventory_initial_amount: 500,
+  },
+  {
+    key: "magnesio",
+    name: "Magnesio glicinato",
+    form: "caps",
+    dose_value: 400,
+    dose_unit: "mg",
+    frequency: "daily",
+    time_of_day: "21:00",
+    notes: "Antes de dormir (21:00–21:30). Pausar si causa molestias GI.",
+    inventory_initial_amount: 400,
+  },
+];
+
+// ── Component ──────────────────────────────────────────
 const Supplements = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -62,7 +141,101 @@ const Supplements = () => {
     setLoading(false);
   }, [user]);
 
-  useEffect(() => { load(); }, [load]);
+  // ── Precarga: ensure defaults exist ──────────────────
+  const ensureDefaultSupplements = useCallback(async () => {
+    if (!user) return;
+
+    const { data: existing, error: exErr } = await supabase
+      .from("user_supplements")
+      .select("id,name")
+      .eq("user_id", user.id);
+
+    if (exErr) return;
+
+    const existingByName = new Map(
+      (existing || []).map((s: any) => [String(s.name).trim().toLowerCase(), s])
+    );
+
+    const today = new Date().toISOString().split("T")[0];
+
+    for (const def of DEFAULT_SUPPLEMENTS) {
+      const key = def.name.trim().toLowerCase();
+      if (existingByName.has(key)) continue;
+
+      const { data: sup, error: insErr } = await supabase
+        .from("user_supplements")
+        .insert({
+          user_id: user.id,
+          name: def.name,
+          brand: null,
+          form: def.form,
+          default_unit: def.dose_unit,
+          notes: def.notes || null,
+          active: true,
+        })
+        .select("id")
+        .single();
+
+      if (insErr || !sup) continue;
+
+      await supabase.from("supplement_regimens").insert({
+        user_id: user.id,
+        supplement_id: sup.id,
+        start_date: today,
+        end_date: null,
+        dose_value: def.dose_value,
+        dose_unit: def.dose_unit,
+        frequency: def.frequency,
+        time_of_day: def.time_of_day || null,
+      });
+    }
+  }, [user]);
+
+  // ── Sync supplements → inventory ─────────────────────
+  const ensureSupplementsInInventory = useCallback(async () => {
+    if (!user) return;
+
+    const { data: sups } = await supabase
+      .from("user_supplements")
+      .select("id,name,default_unit,active")
+      .eq("user_id", user.id);
+
+    if (!sups?.length) return;
+
+    const defByName = new Map(
+      DEFAULT_SUPPLEMENTS.map((d) => [d.name.trim().toLowerCase(), d])
+    );
+
+    for (const s of sups as any[]) {
+      const sName = String(s.name || "").trim();
+      if (!sName) continue;
+
+      const def = defByName.get(sName.toLowerCase());
+
+      await supabase.from("inventory").upsert(
+        {
+          user_id: user.id,
+          ingredient_name: sName,
+          category: "suplementos",
+          grams_available: def?.inventory_initial_amount ?? 0,
+          food_item_id: null,
+          item_type: "supplement",
+          unit: def?.dose_unit ?? s.default_unit ?? "caps",
+        },
+        { onConflict: "user_id,ingredient_name" }
+      );
+    }
+  }, [user]);
+
+  // ── Init: precarga + load ────────────────────────────
+  useEffect(() => {
+    (async () => {
+      if (!user) { setLoading(false); return; }
+      await ensureDefaultSupplements();
+      await ensureSupplementsInInventory();
+      await load();
+    })();
+  }, [user, ensureDefaultSupplements, ensureSupplementsInInventory, load]);
 
   const resetForm = () => {
     setName(""); setBrand(""); setForm("caps"); setDoseValue("");
@@ -97,7 +270,6 @@ const Supplements = () => {
 
   const handleNewRegimen = async (supplementId: string) => {
     if (!user || !doseValue) return;
-    // Close current active regimen
     const currentRegimen = regimens.find(
       (r) => r.supplement_id === supplementId && !r.end_date
     );
