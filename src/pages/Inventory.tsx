@@ -15,6 +15,8 @@ interface InventoryItem {
   category: string;
   grams_available: number;
   food_item_id: string | null;
+  unit: string | null;
+  item_type: string | null;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -25,6 +27,38 @@ const CATEGORY_LABELS: Record<string, string> = {
   granos: "Granos",
   semillas: "Semillas y grasas",
   condimentos: "Condimentos",
+  suplementos: "Suplementos",
+};
+
+const normalizeUnit = (u?: string | null) => (u || "g").toLowerCase();
+
+const formatAmount = (amount: number, unit?: string | null) => {
+  const u = normalizeUnit(unit);
+  const val = Number.isFinite(amount) ? amount : 0;
+  if (u === "ui") return `${Math.round(val)} UI`;
+  if (u === "mcg") return `${Math.round(val)} mcg`;
+  if (u === "mg") return `${Math.round(val)} mg`;
+  if (u === "caps") return `${Math.round(val)} caps`;
+  if (u === "ml") return `${Math.round(val)} ml`;
+  return `${Math.round(val)} g`;
+};
+
+const getStep = (item: InventoryItem) => {
+  const type = (item.item_type || "ingredient").toLowerCase();
+  const u = normalizeUnit(item.unit);
+  if (type !== "supplement") return 50;
+  if (u === "caps") return 1;
+  if (u === "ui") return 500;
+  if (u === "mcg") return 100;
+  if (u === "mg") return 50;
+  if (u === "g") return 1;
+  if (u === "ml") return 5;
+  return 1;
+};
+
+const getDefaultUnitForCategory = (category: string) => {
+  if (category === "suplementos") return "caps";
+  return "g";
 };
 
 const Inventory = () => {
@@ -69,6 +103,8 @@ const Inventory = () => {
         category,
         grams_available: Number(newGrams),
         food_item_id: match?.id || null,
+        item_type: category === "suplementos" ? "supplement" : "ingredient",
+        unit: getDefaultUnitForCategory(category),
       },
       { onConflict: "user_id,ingredient_name" }
     );
@@ -81,9 +117,11 @@ const Inventory = () => {
     }
   };
 
-  const updateGrams = async (id: string, delta: number) => {
+  const updateGrams = async (id: string, direction: -1 | 1) => {
     const item = items.find((i) => i.id === id);
     if (!item) return;
+    const step = getStep(item);
+    const delta = step * direction;
     const newVal = Math.max(0, item.grams_available + delta);
     await supabase.from("inventory").update({ grams_available: newVal }).eq("id", id);
     fetchInventory();
@@ -131,7 +169,7 @@ const Inventory = () => {
                 <option key={k} value={k}>{v}</option>
               ))}
             </select>
-            <Input type="number" placeholder="Gramos" value={newGrams} onChange={(e) => setNewGrams(e.target.value)} />
+            <Input type="number" placeholder="Cantidad" value={newGrams} onChange={(e) => setNewGrams(e.target.value)} />
           </div>
           <Button onClick={addItem} size="sm" className="w-full">
             <Plus className="w-4 h-4 mr-1" /> Agregar
@@ -149,13 +187,13 @@ const Inventory = () => {
               <div key={item.id} className="flex items-center gap-2">
                 <span className="text-sm flex-1">{item.ingredient_name}</span>
                 <div className="flex items-center gap-1">
-                  <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => updateGrams(item.id, -50)}>
+                  <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => updateGrams(item.id, -1)}>
                     <Minus className="w-3 h-3" />
                   </Button>
                   <Badge variant="secondary" className="min-w-[60px] justify-center tabular-nums">
-                    {Math.round(item.grams_available)}g
+                    {formatAmount(item.grams_available, item.unit)}
                   </Badge>
-                  <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => updateGrams(item.id, 50)}>
+                  <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => updateGrams(item.id, 1)}>
                     <Plus className="w-3 h-3" />
                   </Button>
                   <Button
