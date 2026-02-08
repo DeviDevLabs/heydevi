@@ -6,11 +6,12 @@ import { supabase } from "@/integrations/supabase/client";
 import useConsumedMeals from "@/hooks/useConsumedMeals";
 import ProteinBar from "@/components/nutrition/ProteinBar";
 import MealCard from "@/components/nutrition/MealCard";
+import HistoryDrawer from "@/components/history/HistoryDrawer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { getLocalDateStr, getLocalDayName } from "@/lib/dateUtils";
 
-const DAYS = ["Domingo", "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado"];
 const DEFAULT_PROTEIN_TARGET = 100;
 
 // ── Supplement types (mirrors Supplements.tsx) ─────────
@@ -37,8 +38,8 @@ const normName = (n: string) => n.trim().toLowerCase();
 const Dashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const dayName = DAYS[new Date().getDay()];
-  const todayStr = new Date().toISOString().split("T")[0];
+  const dayName = getLocalDayName();
+  const todayStr = getLocalDateStr();
 
   const [proteinTarget, setProteinTarget] = useState(DEFAULT_PROTEIN_TARGET);
   const [consumedMealIds, setConsumedMealIds] = useState<Set<string>>(new Set());
@@ -200,9 +201,12 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold font-serif capitalize">{todayFormatted}</h1>
-        <p className="text-muted-foreground text-sm mt-1">Tu plan nutricional del dia</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold font-serif capitalize">{todayFormatted}</h1>
+          <p className="text-muted-foreground text-sm mt-1">Tu plan nutricional del dia</p>
+        </div>
+        <HistoryDrawer />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
