@@ -20,9 +20,13 @@ export type Database = {
           consumed_date: string
           created_at: string
           description: string | null
+          digestion_score: number | null
           id: string
+          ingredients: Json | null
           meal_label: string
+          meal_name: string | null
           meal_time: string | null
+          mood: string | null
           protein: number
           recipe_id: string | null
           user_id: string
@@ -32,9 +36,13 @@ export type Database = {
           consumed_date?: string
           created_at?: string
           description?: string | null
+          digestion_score?: number | null
           id?: string
+          ingredients?: Json | null
           meal_label: string
+          meal_name?: string | null
           meal_time?: string | null
+          mood?: string | null
           protein?: number
           recipe_id?: string | null
           user_id: string
@@ -44,9 +52,13 @@ export type Database = {
           consumed_date?: string
           created_at?: string
           description?: string | null
+          digestion_score?: number | null
           id?: string
+          ingredients?: Json | null
           meal_label?: string
+          meal_name?: string | null
           meal_time?: string | null
+          mood?: string | null
           protein?: number
           recipe_id?: string | null
           user_id?: string
