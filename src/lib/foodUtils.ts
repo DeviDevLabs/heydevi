@@ -26,9 +26,45 @@ export interface FoodItem {
  * Find a canonical food_item matching the given name (exact or synonym).
  * Returns null if no match found.
  */
+/**
+ * Build an index Map for fast canonical matching.
+ * Key: normalized name/synonym/canonical_name -> FoodItem
+ */
+export function buildFoodItemIndex(
+  foodItems: FoodItem[],
+): Map<string, FoodItem> {
+  const idx = new Map<string, FoodItem>();
+  for (const item of foodItems) {
+    const names = [item.name, item.canonical_name, ...(item.synonyms || [])];
+    for (const n of names) {
+      try {
+        const k = normalizeFoodName(n);
+        if (!idx.has(k)) idx.set(k, item);
+      } catch (e) {
+        // ignore malformed names
+      }
+    }
+  }
+  return idx;
+}
+
+/**
+ * Find a canonical match using an index built by `buildFoodItemIndex`.
+ */
+export function findCanonicalMatchIndexed(
+  name: string,
+  index: Map<string, FoodItem>,
+): FoodItem | null {
+  const k = normalizeFoodName(name);
+  return index.get(k) || null;
+}
+
+/**
+ * Backwards-compatible linear search (slower) kept for callers that pass arrays.
+ */
 export function findCanonicalMatch(
   name: string,
-  foodItems: FoodItem[]
+  foodItems: FoodItem[],
 ): FoodItem | null {
   const normalized = normalizeFoodName(name);
   for (const item of foodItems) {
@@ -57,9 +93,13 @@ export interface WeeklyNeed {
  */
 export function computeWeeklyNeeds(
   planItems: { name: string; totalGrams: number; category: string }[],
-  inventoryItems: { ingredient_name: string; grams_available: number; food_item_id: string | null }[],
+  inventoryItems: {
+    ingredient_name: string;
+    grams_available: number;
+    food_item_id: string | null;
+  }[],
   foodItems: FoodItem[],
-  purchaseSuggestions: Map<string, number> // food_item_id -> suggested qty
+  purchaseSuggestions: Map<string, number>, // food_item_id -> suggested qty
 ): WeeklyNeed[] {
   const needs: WeeklyNeed[] = [];
 
@@ -70,9 +110,11 @@ export function computeWeeklyNeeds(
     // Find inventory for this item
     let inventoryAvailable = 0;
     for (const inv of inventoryItems) {
-      const invMatch = inv.food_item_id && match
-        ? inv.food_item_id === match.id
-        : normalizeFoodName(inv.ingredient_name) === normalizeFoodName(planItem.name);
+      const invMatch =
+        inv.food_item_id && match
+          ? inv.food_item_id === match.id
+          : normalizeFoodName(inv.ingredient_name) ===
+            normalizeFoodName(planItem.name);
       if (invMatch) {
         inventoryAvailable += inv.grams_available;
       }
@@ -81,7 +123,9 @@ export function computeWeeklyNeeds(
     const needed = planItem.totalGrams - inventoryAvailable;
     if (needed <= 0) continue;
 
-    const suggestedQty = match ? purchaseSuggestions.get(match.id) ?? null : null;
+    const suggestedQty = match
+      ? (purchaseSuggestions.get(match.id) ?? null)
+      : null;
 
     needs.push({
       foodItemName: canonicalName,
@@ -102,8 +146,14 @@ export function computeWeeklyNeeds(
  * Compute suggested weekly qty from purchase history:
  * Moving average of last 4 weeks with data (ignore weeks without purchases).
  */
+export interface PurchaseRecord {
+  food_item_id: string;
+  qty: number;
+  week_start: string; // YYYY-MM-DD
+}
+
 export function computeSuggestedWeeklyQty(
-  purchases: { food_item_id: string; qty: number; week_start: string }[]
+  purchases: PurchaseRecord[],
 ): Map<string, number> {
   const byItem = new Map<string, Map<string, number>>();
 
@@ -115,12 +165,15 @@ export function computeSuggestedWeeklyQty(
 
   const result = new Map<string, number>();
   for (const [itemId, weekMap] of byItem) {
-    const weeklyTotals = Array.from(weekMap.values())
-      .sort((a, b) => b - a) // most recent first won't matter for average
-      .slice(0, 4); // last 4 weeks with data
-    if (weeklyTotals.length > 0) {
-      const avg = weeklyTotals.reduce((s, v) => s + v, 0) / weeklyTotals.length;
-      result.set(itemId, avg);
+    // Create array of [week_start, total] and sort by week_start desc (most recent first)
+    const weeklyEntries = Array.from(weekMap.entries())
+      .map(([week, total]) => ({ week, total }))
+      .sort((a, b) => (a.week < b.week ? 1 : a.week > b.week ? -1 : 0));
+
+    const latest4 = weeklyEntries.slice(0, 4);
+    if (latest4.length > 0) {
+      const sum = latest4.reduce((s, e) => s + e.total, 0);
+      result.set(itemId, sum / latest4.length);
     }
   }
 
@@ -131,23 +184,43 @@ export function computeSuggestedWeeklyQty(
  * Fetch all food items from DB.
  */
 export async function fetchFoodItems(): Promise<FoodItem[]> {
-  const { data } = await supabase
-    .from("food_items")
-    .select("*")
-    .order("name");
-  return (data as FoodItem[]) || [];
+  try {
+    const { data, error } = await supabase
+      .from("food_items")
+      .select("*")
+      .order("name");
+    if (error) {
+      console.error("fetchFoodItems error:", error);
+      return [];
+    }
+    return (data as FoodItem[]) || [];
+  } catch (e) {
+    console.error("fetchFoodItems exception:", e);
+    return [];
+  }
 }
 
 /**
  * Fetch user's purchase history (last 8 weeks).
  */
-export async function fetchRecentPurchases(userId: string) {
+export async function fetchRecentPurchases(
+  userId: string,
+): Promise<PurchaseRecord[]> {
   const eightWeeksAgo = new Date();
   eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 56);
-  const { data } = await supabase
-    .from("purchases")
-    .select("food_item_id, qty, week_start")
-    .eq("user_id", userId)
-    .gte("week_start", eightWeeksAgo.toISOString().split("T")[0]);
-  return data || [];
+  try {
+    const { data, error } = await supabase
+      .from("purchases")
+      .select("food_item_id, qty, week_start")
+      .eq("user_id", userId)
+      .gte("week_start", eightWeeksAgo.toISOString().split("T")[0]);
+    if (error) {
+      console.error("fetchRecentPurchases error:", error);
+      return [];
+    }
+    return (data as PurchaseRecord[]) || [];
+  } catch (e) {
+    console.error("fetchRecentPurchases exception:", e);
+    return [];
+  }
 }

@@ -1,4 +1,14 @@
 import { Recipe, RecipeIngredient } from "@/types/nutrition";
+import { normalizeFoodName } from "@/lib/foodUtils";
+import {
+  FIBER_RICH,
+  HIGH_FAT,
+  LACTOSE,
+  GLUTEN,
+  LEGUMES,
+  CRUCIFEROUS,
+  SPICY,
+} from "@/lib/digestiveKeywords";
 
 export interface DigestiveTags {
   highFiber: boolean;
@@ -13,23 +23,42 @@ export interface DigestiveTags {
   digestiveScore: number; // 1-10, higher = gentler
 }
 
-const FIBER_RICH = ["avena", "lentejas", "garbanzos", "brocoli", "espinaca", "quinoa", "arroz integral", "linaza", "semillas"];
-const HIGH_FAT = ["aceite", "nueces", "tahini", "semillas de calabaza", "semillas de hemp"];
-const LACTOSE = ["yogur", "leche", "queso", "crema"];
-const GLUTEN = ["pan integral", "avena", "trigo", "cebada"];
-const LEGUMES = ["lentejas", "garbanzos", "edamame", "frijoles"];
-const CRUCIFEROUS = ["brocoli", "coliflor", "col", "repollo", "kale"];
-const SPICY = ["picante", "chile", "jalapeño", "sriracha", "cayena"];
+/**
+ * Match keywords against an ingredient name using normalization + token
+ * sequence matching. Evita coincidencias por sub-substring (p.ej. no
+ * considerar "lin" como coincidencia de "linaza").
+ */
+function ingredientMatches(
+  ingredient: RecipeIngredient,
+  keywords: string[],
+): boolean {
+  const name = normalizeFoodName(ingredient.name || "");
+  const nameTokens = name.split(" ").filter(Boolean);
 
-function ingredientMatches(ingredient: RecipeIngredient, keywords: string[]): boolean {
-  const name = ingredient.name.toLowerCase();
-  return keywords.some((kw) => name.includes(kw.toLowerCase()));
+  return keywords.some((kw) => {
+    const kwNorm = normalizeFoodName(kw);
+    const kwTokens = kwNorm.split(" ").filter(Boolean);
+    if (kwTokens.length === 0) return false;
+    for (let i = 0; i <= nameTokens.length - kwTokens.length; i++) {
+      let ok = true;
+      for (let j = 0; j < kwTokens.length; j++) {
+        if (nameTokens[i + j] !== kwTokens[j]) {
+          ok = false;
+          break;
+        }
+      }
+      if (ok) return true;
+    }
+    return false;
+  });
 }
 
 export function getDigestiveTags(recipe: Recipe): DigestiveTags {
   const ings = recipe.ingredients;
 
-  const fiberCount = ings.filter((i) => ingredientMatches(i, FIBER_RICH)).length;
+  const fiberCount = ings.filter((i) =>
+    ingredientMatches(i, FIBER_RICH),
+  ).length;
   const fatCount = ings.filter((i) => ingredientMatches(i, HIGH_FAT)).length;
   const hasLactose = ings.some((i) => ingredientMatches(i, LACTOSE));
   const hasGluten = ings.some((i) => ingredientMatches(i, GLUTEN));
@@ -42,18 +71,33 @@ export function getDigestiveTags(recipe: Recipe): DigestiveTags {
   const highFat = fatCount >= 2;
   const lowFat = fatCount === 0;
 
-  // Digestive score: 10 = very gentle, 1 = potentially irritating
-  let score = 10;
-  if (highFiber) score -= 2;
-  if (highFat) score -= 1.5;
-  if (hasLegumes) score -= 1.5;
-  if (hasCruciferous) score -= 1;
-  if (isSpicy) score -= 2;
-  if (hasLactose) score -= 0.5;
-  if (hasGluten) score -= 0.5;
+  // Digestive score stabilizado usando puntuación entera (ponderada).
+  // Base 10 (muy suave). Restamos puntos enteros por factores
+  // que tienden a empeorar la tolerancia.
+  const BASE_SCORE = 10;
+  let score = BASE_SCORE;
+  if (highFiber) score -= 2; // muchas fibras pueden ser irritantes para algunos
+  if (highFat) score -= 1; // grasas pueden ralentizar la digestión
+  if (hasLegumes) score -= 2; // legumbres: gas/flatulencia
+  if (hasCruciferous) score -= 1; // crucíferas: pueden causar gases
+  if (isSpicy) score -= 3; // picante fuerte
+  if (hasLactose) score -= 1; // sensibilidad leve
+  if (hasGluten) score -= 1; // sensibilidad leve
+
   score = Math.max(1, Math.min(10, Math.round(score)));
 
-  return { highFiber, lowFiber, highFat, lowFat, hasLactose, hasGluten, hasLegumes, hasCruciferous, isSpicy, digestiveScore: score };
+  return {
+    highFiber,
+    lowFiber,
+    highFat,
+    lowFat,
+    hasLactose,
+    hasGluten,
+    hasLegumes,
+    hasCruciferous,
+    isSpicy,
+    digestiveScore: score,
+  };
 }
 
 export const SYMPTOM_OPTIONS = [
@@ -82,7 +126,10 @@ export const TRIGGER_OPTIONS = [
   "Frutas secas",
 ] as const;
 
-export function digestiveScoreLabel(score: number): { label: string; color: string } {
+export function digestiveScoreLabel(score: number): {
+  label: string;
+  color: string;
+} {
   if (score >= 8) return { label: "Muy suave", color: "text-green-600" };
   if (score >= 6) return { label: "Suave", color: "text-emerald-500" };
   if (score >= 4) return { label: "Moderada", color: "text-yellow-600" };
