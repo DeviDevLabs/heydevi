@@ -1,6 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { weeklyPlan } from "@/data/mealPlan";
-import { supplements } from "@/data/supplements";
 import { getDayTotalProtein, getDayTotalCalories } from "@/lib/nutritionUtils";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +13,27 @@ import { useToast } from "@/hooks/use-toast";
 const DAYS = ["Domingo", "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado"];
 const DEFAULT_PROTEIN_TARGET = 100;
 
+// ── Supplement types (mirrors Supplements.tsx) ─────────
+interface UserSupplement {
+  id: string;
+  name: string;
+  form: string;
+  default_unit: string;
+  notes: string | null;
+  active: boolean;
+}
+interface Regimen {
+  id: string;
+  supplement_id: string;
+  start_date: string;
+  end_date: string | null;
+  dose_value: number;
+  dose_unit: string;
+  frequency: string;
+  time_of_day: string | null;
+}
+const normName = (n: string) => n.trim().toLowerCase();
+
 const Dashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -22,6 +42,11 @@ const Dashboard = () => {
 
   const [proteinTarget, setProteinTarget] = useState(DEFAULT_PROTEIN_TARGET);
   const [consumedMealIds, setConsumedMealIds] = useState<Set<string>>(new Set());
+
+  // Supplement state
+  const [rawSupplements, setRawSupplements] = useState<UserSupplement[]>([]);
+  const [regimens, setRegimens] = useState<Regimen[]>([]);
+  const [takenSupIds, setTakenSupIds] = useState<Set<string>>(new Set());
 
   const todayPlan = useMemo(
     () => weeklyPlan.find((d) => d.dayName === dayName) || weeklyPlan[0],
@@ -49,17 +74,109 @@ const Dashboard = () => {
         toast({ title: "Error", description: e?.message ?? "Error cargando perfil", variant: "destructive" });
       }
     })();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [user]);
+
+  // ── Load supplements + regimens + today's history ────
+  const loadSupplements = useCallback(async () => {
+    if (!user) return;
+    const [{ data: sups }, { data: regs }, { data: hist }] = await Promise.all([
+      supabase.from("user_supplements").select("*").eq("user_id", user.id).order("active", { ascending: false }),
+      supabase.from("supplement_regimens").select("*").eq("user_id", user.id).order("start_date", { ascending: false }),
+      supabase.from("supplement_histories").select("supplement_id").eq("user_id", user.id).eq("taken_at", todayStr),
+    ]);
+    setRawSupplements((sups as UserSupplement[]) || []);
+    setRegimens((regs as Regimen[]) || []);
+    setTakenSupIds(new Set((hist || []).map((h: any) => h.supplement_id)));
+  }, [user, todayStr]);
+
+  useEffect(() => { loadSupplements(); }, [loadSupplements]);
+
+  // ── Deduplicate & sort supplements (same logic as Supplements.tsx) ──
+  const sortedSupplements = useMemo(() => {
+    const seen = new Map<string, UserSupplement>();
+    for (const s of rawSupplements) {
+      const key = normName(s.name);
+      if (!seen.has(key)) seen.set(key, s);
+      else {
+        const existing = seen.get(key)!;
+        if (!existing.active && s.active) seen.set(key, s);
+      }
+    }
+    const unique = Array.from(seen.values());
+    const latestDate = new Map<string, string>();
+    for (const r of regimens) {
+      const cur = latestDate.get(r.supplement_id);
+      if (!cur || r.start_date > cur) latestDate.set(r.supplement_id, r.start_date);
+    }
+    return unique.sort((a, b) => {
+      if (a.active !== b.active) return a.active ? -1 : 1;
+      const dA = latestDate.get(a.id) || "0000";
+      const dB = latestDate.get(b.id) || "0000";
+      return dB.localeCompare(dA);
+    });
+  }, [rawSupplements, regimens]);
+
+  // ── Get active regimen for a supplement (handles duplicates) ──
+  const getActiveRegimen = useCallback(
+    (supId: string, supName: string): Regimen | undefined => {
+      const allIds = new Set(
+        rawSupplements.filter((s) => normName(s.name) === normName(supName)).map((s) => s.id)
+      );
+      allIds.add(supId);
+      return regimens.find((r) => allIds.has(r.supplement_id) && !r.end_date);
+    },
+    [regimens, rawSupplements]
+  );
+
+  // ── Toggle supplement taken today ────────────────────
+  const toggleSupplementTaken = useCallback(async (sup: UserSupplement) => {
+    if (!user) return;
+    const wasTaken = takenSupIds.has(sup.id);
+
+    // Optimistic update
+    setTakenSupIds((prev) => {
+      const next = new Set(prev);
+      wasTaken ? next.delete(sup.id) : next.add(sup.id);
+      return next;
+    });
+
+    try {
+      if (wasTaken) {
+        const { error } = await supabase
+          .from("supplement_histories")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("supplement_id", sup.id)
+          .eq("taken_at", todayStr);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("supplement_histories")
+          .upsert(
+            { user_id: user.id, supplement_id: sup.id, taken_at: todayStr, source: "dashboard" },
+            { onConflict: "user_id,supplement_id,taken_at" }
+          );
+        if (error) throw error;
+      }
+    } catch (e: any) {
+      // Revert optimistic update
+      setTakenSupIds((prev) => {
+        const next = new Set(prev);
+        wasTaken ? next.add(sup.id) : next.delete(sup.id);
+        return next;
+      });
+      toast({ title: "Error", description: e?.message ?? "Error guardando suplemento", variant: "destructive" });
+    }
+  }, [user, todayStr, takenSupIds, toast]);
+
   // consumed meals hook (fetch + optimistic toggle)
   const { consumedMealIds: consumedFromHook, loading: consumedLoading, toggleMeal } = useConsumedMeals(
     user?.id,
     todayStr
   );
 
-  // Keep a local referece for fast rendering; sync when hook updates
+  // Keep a local reference for fast rendering; sync when hook updates
   useEffect(() => {
     setConsumedMealIds(consumedFromHook);
   }, [consumedFromHook]);
@@ -139,15 +256,36 @@ const Dashboard = () => {
           <CardTitle className="text-base">Suplementos</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {supplements.map((s) => (
-            <div key={s.id} className="flex items-start gap-3">
-              <Checkbox id={`sup-${s.id}`} className="mt-0.5" />
-              <label htmlFor={`sup-${s.id}`} className="text-sm leading-snug cursor-pointer">
-                <span className="font-medium">{s.name}</span>
-                <span className="text-muted-foreground"> — {s.dose}, {s.time}</span>
-              </label>
-            </div>
-          ))}
+          {sortedSupplements.filter(s => s.active).map((sup) => {
+            const active = getActiveRegimen(sup.id, sup.name);
+            const isTaken = takenSupIds.has(sup.id);
+            const doseLabel = active
+              ? `${active.dose_value} ${active.dose_unit}, ${active.frequency === "daily" ? "diario" : active.frequency}`
+              : "";
+            const timeLabel = active?.time_of_day || "";
+            return (
+              <div key={sup.id} className="flex items-start gap-3">
+                <Checkbox
+                  id={`sup-${sup.id}`}
+                  checked={isTaken}
+                  onCheckedChange={() => void toggleSupplementTaken(sup)}
+                  className="mt-0.5"
+                />
+                <label
+                  htmlFor={`sup-${sup.id}`}
+                  className={`text-sm leading-snug cursor-pointer transition-opacity ${isTaken ? "opacity-60 line-through" : ""}`}
+                >
+                  <span className="font-medium">{sup.name}</span>
+                  {doseLabel && (
+                    <span className="text-muted-foreground"> — {doseLabel}{timeLabel ? `, ${timeLabel}` : ""}</span>
+                  )}
+                </label>
+              </div>
+            );
+          })}
+          {sortedSupplements.filter(s => s.active).length === 0 && (
+            <p className="text-xs text-muted-foreground">Sin suplementos activos</p>
+          )}
         </CardContent>
       </Card>
 
