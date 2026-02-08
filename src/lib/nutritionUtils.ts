@@ -41,6 +41,17 @@ export function generateShoppingList(
             let baseGrams = ing.grams ?? 0;
             if (unit === "ml") baseGrams = (ing.grams ?? 0) * mlToGrams;
             if (unit === "caps") baseGrams = (ing.grams ?? 0) * capsToGrams;
+            // backwards-compatible heuristic: some ingredient records don't include a `unit`.
+            // If caller provided a `capsToGrams` conversion and the grams value is a small
+            // integer (likely representing a count of capsules), interpret it as count.
+            if (
+              !unit &&
+              options?.capsToGrams &&
+              Number.isInteger(ing.grams) &&
+              (ing.grams ?? 0) <= 10
+            ) {
+              baseGrams = (ing.grams ?? 0) * capsToGrams;
+            }
 
             const grams = baseGrams * portionFactor;
 
