@@ -12,6 +12,7 @@ const Profile = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [histories, setHistories] = useState<any[]>([]);
   const [form, setForm] = useState({
     weight_kg: "",
     height_cm: "",
@@ -45,6 +46,25 @@ const Profile = () => {
         }
         setLoading(false);
       });
+    // fetch profile histories
+    supabase
+      .from("profile_histories")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (data) setHistories(data as any[]);
+        else {
+          // try localStorage fallback
+          try {
+            const key = `profile_history_${user.id}`;
+            const raw = localStorage.getItem(key);
+            if (raw) setHistories(JSON.parse(raw));
+          } catch (e) {
+            // ignore
+          }
+        }
+      });
   }, [user]);
 
   const handleSave = async () => {
@@ -66,6 +86,37 @@ const Profile = () => {
       .from("profiles")
       .upsert(payload, { onConflict: "user_id" });
 
+    // try to insert a history record; if the table doesn't exist, fall back to localStorage
+    try {
+      const { error: histError } = await supabase.from("profile_histories").insert([
+        {
+          user_id: user.id,
+          profile: payload,
+          created_at: new Date().toISOString(),
+        },
+      ]);
+      if (histError) throw histError;
+      // refresh local state
+      const { data: newHist } = await supabase
+        .from("profile_histories")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      if (newHist) setHistories(newHist as any[]);
+    } catch (e) {
+      // fallback to localStorage
+      try {
+        const key = `profile_history_${user.id}`;
+        const raw = localStorage.getItem(key);
+        const arr = raw ? JSON.parse(raw) : [];
+        arr.unshift({ profile: payload, created_at: new Date().toISOString() });
+        localStorage.setItem(key, JSON.stringify(arr));
+        setHistories(arr);
+      } catch (e) {
+        // ignore
+      }
+    }
+
     setSaving(false);
     if (error) {
       toast({ title: "Error al guardar", description: error.message, variant: "destructive" });
@@ -81,6 +132,10 @@ const Profile = () => {
       <div>
         <h1 className="text-2xl font-bold font-serif">Perfil</h1>
         <p className="text-muted-foreground text-sm mt-1">Tus datos y metas nutricionales</p>
+        <div className="mt-4 text-sm">
+          <p className="font-medium">Nombre: {user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || "-"}</p>
+          <p className="text-muted-foreground">Correo: {user?.email || "-"}</p>
+        </div>
       </div>
 
       <Card>
@@ -146,6 +201,25 @@ const Profile = () => {
       <Button onClick={handleSave} disabled={saving} className="w-full">
         {saving ? "Guardando..." : "Guardar perfil"}
       </Button>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Historial de cambios</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {histories.length === 0 && <p className="text-sm text-muted-foreground">No hay historial aún.</p>}
+          {histories.map((h, idx) => {
+            const created = h.created_at ? new Date(h.created_at).toLocaleString() : "-";
+            const p = h.profile || h;
+            return (
+              <div key={idx} className="p-2 border rounded-md">
+                <div className="text-xs text-muted-foreground">{created}</div>
+                <div className="text-sm">Peso: {p.weight_kg ?? "-"} kg — Proteína: {p.protein_target ?? "-"} g</div>
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
     </div>
   );
 };
