@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,8 @@ const Auth = () => {
   const [submitting, setSubmitting] = useState(false);
   const [liveMessage, setLiveMessage] = useState<string | null>(null);
   const [liveVariant, setLiveVariant] = useState<"success" | "error" | null>(null);
+  const emailRef = useRef<HTMLInputElement | null>(null);
+  const passwordRef = useRef<HTMLInputElement | null>(null);
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -30,12 +32,18 @@ const Auth = () => {
 
     const emailResult = emailSchema.safeParse(email);
     if (!emailResult.success) {
-      toast({ title: "Error", description: emailResult.error.errors[0].message, variant: "destructive" });
+      const msg = emailResult.error.errors[0].message;
+      toast({ title: "Error", description: msg, variant: "destructive" });
+      // focus email input for accessibility
+      emailRef.current?.focus();
       return;
     }
     const passResult = passwordSchema.safeParse(password);
     if (!passResult.success) {
-      toast({ title: "Error", description: passResult.error.errors[0].message, variant: "destructive" });
+      const msg = passResult.error.errors[0].message;
+      toast({ title: "Error", description: msg, variant: "destructive" });
+      // focus password input for accessibility
+      passwordRef.current?.focus();
       return;
     }
 
