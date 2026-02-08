@@ -4,6 +4,7 @@ import { supplements } from "@/data/supplements";
 import { getDayTotalProtein, getDayTotalCalories } from "@/lib/nutritionUtils";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import useConsumedMeals from "@/hooks/useConsumedMeals";
 import ProteinBar from "@/components/nutrition/ProteinBar";
 import MealCard from "@/components/nutrition/MealCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,74 +31,46 @@ const Dashboard = () => {
   // Load user protein target
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from("profiles")
-      .select("protein_target")
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then(({ data }) => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("protein_target")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (error) {
+          toast({ title: "Error", description: error.message, variant: "destructive" });
+          return;
+        }
+        if (!mounted) return;
         if (data?.protein_target) setProteinTarget(data.protein_target);
-      });
-  }, [user]);
-
-  // Load consumed meals for today
-  const loadConsumed = useCallback(async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from("consumed_meals")
-      .select("meal_label, meal_time")
-      .eq("user_id", user.id)
-      .eq("consumed_date", todayStr);
-    if (data) {
-      setConsumedMealIds(new Set(data.map((m) => `${m.meal_time}-${m.meal_label}`)));
-    }
-  }, [user, todayStr]);
-
-  useEffect(() => {
-    loadConsumed();
-  }, [loadConsumed]);
-
-  const toggleMealConsumed = async (meal: typeof todayPlan.meals[0]) => {
-    if (!user) return;
-    const mealKey = `${meal.time}-${meal.label}`;
-
-    if (consumedMealIds.has(mealKey)) {
-      // Remove
-      await supabase
-        .from("consumed_meals")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("consumed_date", todayStr)
-        .eq("meal_label", meal.label)
-        .eq("meal_time", meal.time);
-      setConsumedMealIds((prev) => {
-        const next = new Set(prev);
-        next.delete(mealKey);
-        return next;
-      });
-    } else {
-      // Add
-      const { error } = await supabase.from("consumed_meals").insert({
-        user_id: user.id,
-        consumed_date: todayStr,
-        meal_label: meal.label,
-        meal_time: meal.time,
-        recipe_id: meal.recipeId || null,
-        description: meal.description,
-        protein: meal.protein,
-        calories: meal.calories,
-      });
-      if (error) {
-        toast({ title: "Error", description: error.message, variant: "destructive" });
-        return;
+      } catch (e: any) {
+        toast({ title: "Error", description: e?.message ?? "Error cargando perfil", variant: "destructive" });
       }
-      setConsumedMealIds((prev) => new Set(prev).add(mealKey));
-    }
-  };
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
+  // consumed meals hook (fetch + optimistic toggle)
+  const { consumedMealIds: consumedFromHook, loading: consumedLoading, toggleMeal } = useConsumedMeals(
+    user?.id,
+    todayStr
+  );
 
-  const consumedProtein = todayPlan.meals
-    .filter((m) => consumedMealIds.has(`${m.time}-${m.label}`))
-    .reduce((sum, m) => sum + m.protein, 0);
+  // Keep a local referece for fast rendering; sync when hook updates
+  useEffect(() => {
+    setConsumedMealIds(consumedFromHook);
+  }, [consumedFromHook]);
+
+  const consumedProtein = useMemo(
+    () =>
+      todayPlan.meals
+        .filter((m) => consumedMealIds.has(`${m.time}-${m.label}`))
+        .reduce((sum, m) => sum + m.protein, 0),
+    [todayPlan.meals, consumedMealIds]
+  );
 
   const totalProtein = getDayTotalProtein(todayPlan);
   const totalCalories = getDayTotalCalories(todayPlan);
@@ -150,7 +123,7 @@ const Dashboard = () => {
             <div key={i} className="flex items-start gap-3">
               <Checkbox
                 checked={isConsumed}
-                onCheckedChange={() => toggleMealConsumed(meal)}
+                onCheckedChange={() => void toggleMeal(meal)}
                 className="mt-4"
               />
               <div className={`flex-1 transition-opacity ${isConsumed ? "opacity-60" : ""}`}>
