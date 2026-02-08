@@ -10,6 +10,7 @@ import {
   computeWeeklyNeeds,
   computeSuggestedWeeklyQty,
   findCanonicalMatch,
+  buildFoodItemIndex,
   type FoodItem,
   type WeeklyNeed,
 } from "@/lib/foodUtils";
@@ -42,17 +43,7 @@ const ShoppingList = () => {
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
-  // Generate raw plan requirements from static recipes
-  const planItems = useMemo(() => {
-    const raw = generateShoppingList(weeklyPlan, recipes);
-    const flat: { name: string; totalGrams: number; category: string }[] = [];
-    for (const items of Object.values(raw)) {
-      for (const item of items) {
-        flat.push({ name: item.name, totalGrams: item.totalGrams, category: item.category });
-      }
-    }
-    return flat;
-  }, []);
+  // plan items are generated during data load to allow using canonical names
 
   const loadData = useCallback(async () => {
     if (!user) { setLoading(false); return; }
@@ -69,15 +60,25 @@ const ShoppingList = () => {
 
     setFoodItems(items);
     const suggestions = computeSuggestedWeeklyQty(purchaseData);
+    // build index to prefer canonical names when generating shopping list
+    const idx = buildFoodItemIndex(items as any);
+    const raw = generateShoppingList(weeklyPlan, recipes, idx);
+    const flat: { name: string; totalGrams: number; category: string }[] = [];
+    for (const arr of Object.values(raw)) {
+      for (const item of arr) {
+        flat.push({ name: item.name, totalGrams: item.totalGrams, category: item.category });
+      }
+    }
+
     const computed = computeWeeklyNeeds(
-      planItems,
+      flat,
       (inventory || []) as any,
       items,
       suggestions
     );
     setNeeds(computed);
     setLoading(false);
-  }, [user, planItems]);
+  }, [user]);
 
   useEffect(() => {
     loadData();
