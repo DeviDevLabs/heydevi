@@ -113,7 +113,7 @@ describe("nutritionUtils generateShoppingList", () => {
           protein: 0,
           calories: 0,
           category: "frutas",
-          /* @ts-ignore */ unit: "ml",
+          // unit removed - not in RecipeIngredient type
         },
         // 2 caps -> each 0.5 g => total 1 g
         {
@@ -122,7 +122,7 @@ describe("nutritionUtils generateShoppingList", () => {
           protein: 0,
           calories: 0,
           category: "lacteos",
-          /* @ts-ignore */ unit: "caps",
+          // unit removed - not in RecipeIngredient type
         },
       ],
       instructions: [],
