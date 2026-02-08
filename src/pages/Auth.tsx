@@ -1,12 +1,18 @@
 import { useState } from "react";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { lovable } from "@/integrations/lovable/index";
 
 const Auth = () => {
+  const { user, loading } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
+
+  if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">Cargando...</p></div>;
+  if (user) return <Navigate to="/" replace />;
 
   const handleGoogleLogin = async () => {
     setSubmitting(true);
