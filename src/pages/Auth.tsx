@@ -36,6 +36,8 @@ const Auth = () => {
       toast({ title: "Error", description: msg, variant: "destructive" });
       // focus email input for accessibility
       emailRef.current?.focus();
+      setLiveMessage(msg);
+      setLiveVariant("error");
       return;
     }
     const passResult = passwordSchema.safeParse(password);
@@ -44,6 +46,8 @@ const Auth = () => {
       toast({ title: "Error", description: msg, variant: "destructive" });
       // focus password input for accessibility
       passwordRef.current?.focus();
+      setLiveMessage(msg);
+      setLiveVariant("error");
       return;
     }
 
@@ -112,7 +116,7 @@ const Auth = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <div className="space-y-2">
                 <Label htmlFor="email">Correo electronico</Label>
                 <Input
@@ -121,6 +125,7 @@ const Auth = () => {
                   placeholder="tu@correo.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  ref={emailRef}
                   disabled={submitting}
                   required
                 />
@@ -133,6 +138,7 @@ const Auth = () => {
                   placeholder="Minimo 6 caracteres"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  ref={passwordRef}
                   disabled={submitting}
                   required
                 />
