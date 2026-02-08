@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +31,9 @@ interface Regimen {
   time_of_day: string | null;
 }
 
+// ── Normalize helper ───────────────────────────────────
+const normName = (n: string) => n.trim().toLowerCase();
+
 // ── Default supplements (source of truth) ──────────────
 type DefaultSup = {
   key: string;
@@ -45,75 +48,19 @@ type DefaultSup = {
 };
 
 const DEFAULT_SUPPLEMENTS: DefaultSup[] = [
-  {
-    key: "creatina",
-    name: "Creatina monohidrato",
-    form: "powder",
-    dose_value: 5,
-    dose_unit: "g",
-    frequency: "daily",
-    time_of_day: "07:00",
-    notes: "Post-entreno. Mezclar con agua o batido.",
-    inventory_initial_amount: 5,
-  },
-  {
-    key: "d3k2",
-    name: "Vitamina D3 + K2",
-    form: "caps",
-    dose_value: 2000,
-    dose_unit: "UI",
-    frequency: "daily",
-    notes: "Con desayuno. Incluye K2 100 mcg.",
-    inventory_initial_amount: 2000,
-  },
-  {
-    key: "b12",
-    name: "B12 metilcobalamina",
-    form: "caps",
-    dose_value: 1000,
-    dose_unit: "mcg",
-    frequency: "mon-wed-fri",
-    notes: "Por la mañana. Esencial en dieta vegetariana.",
-    inventory_initial_amount: 1000,
-  },
-  {
-    key: "omega3",
-    name: "Omega-3 de algas (DHA+EPA)",
-    form: "caps",
-    dose_value: 500,
-    dose_unit: "mg",
-    frequency: "daily",
-    notes: "Con desayuno. Rango 250–500 mg.",
-    inventory_initial_amount: 500,
-  },
-  {
-    key: "vitc",
-    name: "Vitamina C",
-    form: "caps",
-    dose_value: 500,
-    dose_unit: "mg",
-    frequency: "daily",
-    notes: "Media mañana o comida. Evitar justo antes/después del entreno.",
-    inventory_initial_amount: 500,
-  },
-  {
-    key: "magnesio",
-    name: "Magnesio glicinato",
-    form: "caps",
-    dose_value: 400,
-    dose_unit: "mg",
-    frequency: "daily",
-    time_of_day: "21:00",
-    notes: "Antes de dormir (21:00–21:30). Pausar si causa molestias GI.",
-    inventory_initial_amount: 400,
-  },
+  { key: "creatina", name: "Creatina monohidrato", form: "powder", dose_value: 5, dose_unit: "g", frequency: "daily", time_of_day: "07:00", notes: "Post-entreno. Mezclar con agua o batido.", inventory_initial_amount: 5 },
+  { key: "d3k2", name: "Vitamina D3 + K2", form: "caps", dose_value: 2000, dose_unit: "UI", frequency: "daily", notes: "Con desayuno. Incluye K2 100 mcg.", inventory_initial_amount: 2000 },
+  { key: "b12", name: "B12 metilcobalamina", form: "caps", dose_value: 1000, dose_unit: "mcg", frequency: "mon-wed-fri", notes: "Por la mañana. Esencial en dieta vegetariana.", inventory_initial_amount: 1000 },
+  { key: "omega3", name: "Omega-3 de algas (DHA+EPA)", form: "caps", dose_value: 500, dose_unit: "mg", frequency: "daily", notes: "Con desayuno. Rango 250–500 mg.", inventory_initial_amount: 500 },
+  { key: "vitc", name: "Vitamina C", form: "caps", dose_value: 500, dose_unit: "mg", frequency: "daily", notes: "Media mañana o comida. Evitar justo antes/después del entreno.", inventory_initial_amount: 500 },
+  { key: "magnesio", name: "Magnesio glicinato", form: "caps", dose_value: 400, dose_unit: "mg", frequency: "daily", time_of_day: "21:00", notes: "Antes de dormir (21:00–21:30). Pausar si causa molestias GI.", inventory_initial_amount: 400 },
 ];
 
 // ── Component ──────────────────────────────────────────
 const Supplements = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [supplements, setSupplements] = useState<UserSupplement[]>([]);
+  const [rawSupplements, setRawSupplements] = useState<UserSupplement[]>([]);
   const [regimens, setRegimens] = useState<Regimen[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -130,18 +77,87 @@ const Supplements = () => {
   const [timeOfDay, setTimeOfDay] = useState("");
   const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
 
+  // ── Deduplicate supplements by normalized name ───────
+  // Keep the one with the most recent regimen (or first created)
+  const supplements = useMemo(() => {
+    const seen = new Map<string, UserSupplement>();
+    // Sort raw supplements so that when we encounter duplicates, we keep
+    // the one with the latest regimen activity (determined below via ordering)
+    for (const s of rawSupplements) {
+      const key = normName(s.name);
+      if (!seen.has(key)) {
+        seen.set(key, s);
+      }
+      // If duplicate, keep the one that is active, or the first one
+      else {
+        const existing = seen.get(key)!;
+        if (!existing.active && s.active) {
+          seen.set(key, s);
+        }
+      }
+    }
+    return Array.from(seen.values());
+  }, [rawSupplements]);
+
+  // ── Order supplements by most recent regimen ─────────
+  const sortedSupplements = useMemo(() => {
+    const latestRegimenDate = new Map<string, string>();
+    for (const r of regimens) {
+      const current = latestRegimenDate.get(r.supplement_id);
+      if (!current || r.start_date > current) {
+        latestRegimenDate.set(r.supplement_id, r.start_date);
+      }
+    }
+    return [...supplements].sort((a, b) => {
+      // Active first, then by latest regimen date desc
+      if (a.active !== b.active) return a.active ? -1 : 1;
+      const dateA = latestRegimenDate.get(a.id) || "0000";
+      const dateB = latestRegimenDate.get(b.id) || "0000";
+      return dateB.localeCompare(dateA);
+    });
+  }, [supplements, regimens]);
+
+  // ── Collect all duplicate IDs for a normalized name ──
+  const duplicateIdsForName = useCallback(
+    (normalizedName: string): string[] => {
+      return rawSupplements
+        .filter((s) => normName(s.name) === normalizedName)
+        .map((s) => s.id);
+    },
+    [rawSupplements]
+  );
+
+  // ── Get regimens for a supplement (include duplicates) ──
+  const getHistory = useCallback(
+    (supId: string, supName: string): Regimen[] => {
+      const allIds = new Set(duplicateIdsForName(normName(supName)));
+      allIds.add(supId);
+      return regimens.filter((r) => allIds.has(r.supplement_id));
+    },
+    [regimens, duplicateIdsForName]
+  );
+
+  const getActiveRegimen = useCallback(
+    (supId: string, supName: string): Regimen | undefined => {
+      const allIds = new Set(duplicateIdsForName(normName(supName)));
+      allIds.add(supId);
+      return regimens.find((r) => allIds.has(r.supplement_id) && !r.end_date);
+    },
+    [regimens, duplicateIdsForName]
+  );
+
   const load = useCallback(async () => {
     if (!user) { setLoading(false); return; }
     const [{ data: sups }, { data: regs }] = await Promise.all([
-      supabase.from("user_supplements").select("*").eq("user_id", user.id).order("active", { ascending: false }),
+      supabase.from("user_supplements").select("*").eq("user_id", user.id),
       supabase.from("supplement_regimens").select("*").eq("user_id", user.id).order("start_date", { ascending: false }),
     ]);
-    setSupplements((sups as UserSupplement[]) || []);
+    setRawSupplements((sups as UserSupplement[]) || []);
     setRegimens((regs as Regimen[]) || []);
     setLoading(false);
   }, [user]);
 
-  // ── Precarga: ensure defaults exist ──────────────────
+  // ── Precarga: ensure defaults exist (no duplicates) ──
   const ensureDefaultSupplements = useCallback(async () => {
     if (!user) return;
 
@@ -152,15 +168,14 @@ const Supplements = () => {
 
     if (exErr) return;
 
-    const existingByName = new Map(
-      (existing || []).map((s: any) => [String(s.name).trim().toLowerCase(), s])
+    const existingByNorm = new Set(
+      (existing || []).map((s: any) => normName(String(s.name)))
     );
 
     const today = new Date().toISOString().split("T")[0];
 
     for (const def of DEFAULT_SUPPLEMENTS) {
-      const key = def.name.trim().toLowerCase();
-      if (existingByName.has(key)) continue;
+      if (existingByNorm.has(normName(def.name))) continue;
 
       const { data: sup, error: insErr } = await supabase
         .from("user_supplements")
@@ -202,20 +217,22 @@ const Supplements = () => {
 
     if (!sups?.length) return;
 
+    // Deduplicate: only sync the canonical (first) supplement per normalized name
+    const seen = new Set<string>();
     const defByName = new Map(
-      DEFAULT_SUPPLEMENTS.map((d) => [d.name.trim().toLowerCase(), d])
+      DEFAULT_SUPPLEMENTS.map((d) => [normName(d.name), d])
     );
 
     for (const s of sups as any[]) {
-      const sName = String(s.name || "").trim();
-      if (!sName) continue;
+      const norm = normName(String(s.name || ""));
+      if (!norm || seen.has(norm)) continue;
+      seen.add(norm);
 
-      const def = defByName.get(sName.toLowerCase());
-
+      const def = defByName.get(norm);
       await supabase.from("inventory").upsert(
         {
           user_id: user.id,
-          ingredient_name: sName,
+          ingredient_name: String(s.name).trim(),
           category: "suplementos",
           grams_available: def?.inventory_initial_amount ?? 0,
           food_item_id: null,
@@ -227,7 +244,7 @@ const Supplements = () => {
     }
   }, [user]);
 
-  // ── Init: precarga + load ────────────────────────────
+  // ── Init ─────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       if (!user) { setLoading(false); return; }
@@ -244,40 +261,76 @@ const Supplements = () => {
     setShowAdd(false); setEditingRegimen(null);
   };
 
+  // ── Add supplement: reuse existing if name matches ───
   const handleAddSupplement = async () => {
     if (!user || !name.trim() || !doseValue) return;
-    const { data: sup, error } = await supabase
-      .from("user_supplements")
-      .insert({ user_id: user.id, name: name.trim(), brand: brand || null, form, default_unit: doseUnit })
-      .select("id")
-      .single();
-    if (error || !sup) {
-      toast({ title: "Error", description: error?.message, variant: "destructive" });
-      return;
+    const norm = normName(name);
+    const existing = rawSupplements.find((s) => normName(s.name) === norm);
+
+    let supplementId: string;
+
+    if (existing) {
+      // Reuse existing — don't insert duplicate
+      supplementId = existing.id;
+      // Reactivate if it was inactive
+      if (!existing.active) {
+        await supabase.from("user_supplements").update({ active: true }).eq("id", existing.id);
+      }
+    } else {
+      // Create new supplement
+      const { data: sup, error } = await supabase
+        .from("user_supplements")
+        .insert({ user_id: user.id, name: name.trim(), brand: brand || null, form, default_unit: doseUnit })
+        .select("id")
+        .single();
+      if (error || !sup) {
+        toast({ title: "Error", description: error?.message, variant: "destructive" });
+        return;
+      }
+      supplementId = sup.id;
     }
+
+    // Close any active regimen for this supplement
+    const activeReg = regimens.find(
+      (r) => r.supplement_id === supplementId && !r.end_date
+    );
+    if (activeReg) {
+      await supabase.from("supplement_regimens")
+        .update({ end_date: startDate })
+        .eq("id", activeReg.id);
+    }
+
+    // Insert new regimen
     await supabase.from("supplement_regimens").insert({
       user_id: user.id,
-      supplement_id: sup.id,
+      supplement_id: supplementId,
       start_date: startDate,
       dose_value: Number(doseValue),
       dose_unit: doseUnit,
       frequency,
       time_of_day: timeOfDay || null,
     });
+
     resetForm();
     load();
   };
 
+  // ── New regimen for existing supplement ───────────────
   const handleNewRegimen = async (supplementId: string) => {
     if (!user || !doseValue) return;
-    const currentRegimen = regimens.find(
-      (r) => r.supplement_id === supplementId && !r.end_date
-    );
-    if (currentRegimen) {
-      await supabase.from("supplement_regimens")
-        .update({ end_date: startDate })
-        .eq("id", currentRegimen.id);
+    // Close active regimen (check all duplicate IDs)
+    const sup = rawSupplements.find((s) => s.id === supplementId);
+    const allIds = sup ? duplicateIdsForName(normName(sup.name)) : [supplementId];
+
+    for (const id of allIds) {
+      const active = regimens.find((r) => r.supplement_id === id && !r.end_date);
+      if (active) {
+        await supabase.from("supplement_regimens")
+          .update({ end_date: startDate })
+          .eq("id", active.id);
+      }
     }
+
     await supabase.from("supplement_regimens").insert({
       user_id: user.id,
       supplement_id: supplementId,
@@ -291,16 +344,46 @@ const Supplements = () => {
     load();
   };
 
+  // ── Toggle active / mark finished ────────────────────
   const toggleActive = async (sup: UserSupplement) => {
-    await supabase.from("user_supplements").update({ active: !sup.active }).eq("id", sup.id);
+    const newActive = !sup.active;
+    await supabase.from("user_supplements").update({ active: newActive }).eq("id", sup.id);
+
+    if (!newActive) {
+      // Mark finished: close active regimen
+      const allIds = duplicateIdsForName(normName(sup.name));
+      for (const id of allIds) {
+        const active = regimens.find((r) => r.supplement_id === id && !r.end_date);
+        if (active) {
+          const today = new Date().toISOString().split("T")[0];
+          await supabase.from("supplement_regimens")
+            .update({ end_date: today })
+            .eq("id", active.id);
+        }
+      }
+
+      // Add to shopping list: set inventory to 0 so it appears as needed
+      await supabase.from("inventory").upsert(
+        {
+          user_id: user!.id,
+          ingredient_name: sup.name.trim(),
+          category: "suplementos",
+          grams_available: 0,
+          food_item_id: null,
+          item_type: "supplement",
+          unit: sup.default_unit || "caps",
+        },
+        { onConflict: "user_id,ingredient_name" }
+      );
+
+      toast({
+        title: "Suplemento finalizado",
+        description: `${sup.name} añadido a la lista de compra.`,
+      });
+    }
+
     load();
   };
-
-  const getActiveRegimen = (supId: string) =>
-    regimens.find((r) => r.supplement_id === supId && !r.end_date);
-
-  const getHistory = (supId: string) =>
-    regimens.filter((r) => r.supplement_id === supId);
 
   if (loading) return <p className="text-muted-foreground text-sm p-4">Cargando suplementos...</p>;
 
@@ -357,15 +440,15 @@ const Supplements = () => {
         </Card>
       )}
 
-      {supplements.length === 0 && !showAdd && (
+      {sortedSupplements.length === 0 && !showAdd && (
         <p className="text-center text-muted-foreground text-sm py-8">
           Sin suplementos registrados. Usa el botón Agregar.
         </p>
       )}
 
-      {supplements.map((sup) => {
-        const active = getActiveRegimen(sup.id);
-        const history = getHistory(sup.id);
+      {sortedSupplements.map((sup) => {
+        const active = getActiveRegimen(sup.id, sup.name);
+        const history = getHistory(sup.id, sup.name);
         const showingHistory = historyFor === sup.id;
         const showingEdit = editingRegimen === sup.id;
 
