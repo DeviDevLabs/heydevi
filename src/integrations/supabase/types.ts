@@ -252,6 +252,8 @@ export type Database = {
           grams_available: number
           id: string
           ingredient_name: string
+          item_type: string
+          unit: string
           updated_at: string
           user_id: string
         }
@@ -262,6 +264,8 @@ export type Database = {
           grams_available?: number
           id?: string
           ingredient_name: string
+          item_type?: string
+          unit?: string
           updated_at?: string
           user_id: string
         }
@@ -272,6 +276,8 @@ export type Database = {
           grams_available?: number
           id?: string
           ingredient_name?: string
+          item_type?: string
+          unit?: string
           updated_at?: string
           user_id?: string
         }
