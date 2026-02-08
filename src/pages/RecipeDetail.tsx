@@ -15,7 +15,7 @@ const RecipeDetail = () => {
   const recipe = recipes.find((r) => r.id === id);
   const [multiplier, setMultiplier] = useState(1);
 
-  const digestiveTags = useMemo(() => (recipe ? getDigestiveTags(recipe) : []), [recipe?.id]);
+  const digestiveTags = useMemo(() => (recipe ? getDigestiveTags(recipe) : { highFiber: false, lowFiber: false, highFat: false, lowFat: false, hasLactose: false, hasGluten: false, hasLegumes: false, hasCruciferous: false, isSpicy: false, digestiveScore: 5 } as import("@/lib/digestiveUtils").DigestiveTags), [recipe?.id]);
 
   const totalProteinRounded = useMemo(
     () => Math.round((recipe?.totalProtein ?? 0) * multiplier),
