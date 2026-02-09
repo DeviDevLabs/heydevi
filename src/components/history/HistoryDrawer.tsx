@@ -5,23 +5,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDateES, getMonthRange, getLocalDateStr } from "@/lib/dateUtils";
-import { History, Download, Circle } from "lucide-react";
+import { History, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Badge } from "@/components/ui/badge";
 
 interface MealEntry {
   id: string;
   consumed_date: string;
   meal_label: string;
-  meal_name?: string | null;
   meal_time?: string | null;
   description?: string | null;
   calories?: number | null;
   protein?: number | null;
-  ingredients?: unknown;
-  mood?: string | null;
-  digestion_score?: number | null;
 }
 
 interface DaySummary {
@@ -42,55 +37,6 @@ const HistoryDrawer = () => {
   const todayStr = getLocalDateStr();
   const { start: monthStart, end: monthEnd } = getMonthRange();
 
-  const normalizeIngredients = (ingredients: unknown) => {
-    if (!ingredients) return [] as string[];
-    if (Array.isArray(ingredients)) {
-      return ingredients
-        .map((item) => {
-          if (item && typeof item === "object") {
-            const candidate =
-              "name" in item
-                ? (item as { name?: unknown }).name
-                : "ingredient_name" in item
-                  ? (item as { ingredient_name?: unknown }).ingredient_name
-                  : "ingredient" in item
-                    ? (item as { ingredient?: unknown }).ingredient
-                    : item;
-            return String(candidate ?? "").trim();
-          }
-          return String(item ?? "").trim();
-        })
-        .filter(Boolean);
-    }
-    if (typeof ingredients === "string") {
-      return ingredients
-        .split(/[,;]+/)
-        .map((item) => item.trim())
-        .filter(Boolean);
-    }
-    return [] as string[];
-  };
-
-  const getDigestiveIndicator = (meal: MealEntry) => {
-    const score = meal.digestion_score;
-    if (typeof score === "number") {
-      if (score >= 4) return "good";
-      if (score <= 2) return "heavy";
-      return "neutral";
-    }
-    const mood = meal.mood?.toLowerCase();
-    if (mood?.includes("bien") || mood?.includes("liger") || mood?.includes("ok")) return "good";
-    if (mood?.includes("pesad") || mood?.includes("mal") || mood?.includes("inflam")) return "heavy";
-    return "neutral";
-  };
-
-  const getFeelGoodLabel = (meal: MealEntry) => {
-    const indicator = getDigestiveIndicator(meal);
-    if (indicator === "good") return "Ligero";
-    if (indicator === "heavy") return "Pesado";
-    return null;
-  };
-
   const loadHistory = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -98,7 +44,7 @@ const HistoryDrawer = () => {
       const { data, error } = await supabase
         .from("consumed_meals")
         .select(
-          "id, consumed_date, calories, protein, meal_label, meal_name, meal_time, description, ingredients, mood, digestion_score",
+          "id, consumed_date, calories, protein, meal_label, meal_time, description",
         )
         .eq("user_id", user.id)
         .gte("consumed_date", monthStart)
@@ -146,22 +92,9 @@ const HistoryDrawer = () => {
       return;
     }
 
-    const header = "Fecha,Calorías,Proteína (g),Comidas registradas,Ingredientes,Notas digestivas";
+    const header = "Fecha,Calorías,Proteína (g),Comidas registradas";
     const rows = days.map((d) => {
-      const ingredients = Array.from(new Set(d.meals.flatMap((meal) => normalizeIngredients(meal.ingredients)))).join(
-        " | ",
-      );
-      const notes = d.meals
-        .map((meal) => {
-          const name = meal.meal_name || meal.meal_label || "Comida";
-          const score = typeof meal.digestion_score === "number" ? `score ${meal.digestion_score}` : "";
-          const mood = meal.mood ? `mood ${meal.mood}` : "";
-          const label = [score, mood].filter(Boolean).join(" ");
-          return label ? `${name}: ${label}` : null;
-        })
-        .filter(Boolean)
-        .join(" | ");
-      return `${d.date},${d.totalCalories},${d.totalProtein},${d.mealsCount},"${ingredients}","${notes}"`;
+      return `${d.date},${d.totalCalories},${d.totalProtein},${d.mealsCount}`;
     });
     const csv = [header, ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -223,10 +156,7 @@ const HistoryDrawer = () => {
                   <AccordionContent className="px-3 pb-3">
                     <div className="space-y-3">
                       {day.meals.map((meal) => {
-                        const ingredients = normalizeIngredients(meal.ingredients);
-                        const indicator = getDigestiveIndicator(meal);
-                        const feelLabel = getFeelGoodLabel(meal);
-                        const mealName = meal.meal_name || meal.meal_label || "Comida";
+                        const mealName = meal.meal_label || "Comida";
                         return (
                           <div key={meal.id} className="rounded-md border border-border/60 p-3">
                             <div className="flex items-start justify-between gap-3">
@@ -236,53 +166,18 @@ const HistoryDrawer = () => {
                                   {meal.meal_time ? (
                                     <span className="text-xs text-muted-foreground">{meal.meal_time}</span>
                                   ) : null}
-                                  {feelLabel ? <Badge variant="secondary">{feelLabel}</Badge> : null}
                                 </div>
                                 {meal.description ? (
                                   <p className="text-xs text-muted-foreground mt-1">{meal.description}</p>
                                 ) : null}
                               </div>
-                              <div className="flex items-center gap-2">
-                                {indicator !== "neutral" ? (
-                                  <span
-                                    className={`inline-flex items-center text-xs ${
-                                      indicator === "good" ? "text-emerald-600" : "text-rose-600"
-                                    }`}
-                                  >
-                                    <Circle className="w-2.5 h-2.5 fill-current" />
-                                  </span>
-                                ) : null}
-                                <div className="text-right">
-                                  <p className="text-xs font-medium">{Number(meal.calories) || 0} kcal</p>
-                                  <p className="text-[11px] text-muted-foreground">
-                                    {Number(meal.protein) || 0}g proteína
-                                  </p>
-                                </div>
+                              <div className="text-right">
+                                <p className="text-xs font-medium">{Number(meal.calories) || 0} kcal</p>
+                                <p className="text-[11px] text-muted-foreground">
+                                  {Number(meal.protein) || 0}g proteína
+                                </p>
                               </div>
                             </div>
-                            {ingredients.length > 0 ? (
-                              <div className="mt-2 flex flex-wrap gap-2">
-                                {ingredients.map((ingredient) => (
-                                  <Badge
-                                    key={`${meal.id}-${ingredient}`}
-                                    variant={indicator === "good" ? "default" : "outline"}
-                                    className="text-[11px] px-2 py-0.5"
-                                  >
-                                    {ingredient}
-                                  </Badge>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="mt-2 text-xs text-muted-foreground">Sin ingredientes registrados</p>
-                            )}
-                            {meal.mood || typeof meal.digestion_score === "number" ? (
-                              <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                {typeof meal.digestion_score === "number" ? (
-                                  <span>Digestión: {meal.digestion_score}/5</span>
-                                ) : null}
-                                {meal.mood ? <span>Ánimo: {meal.mood}</span> : null}
-                              </div>
-                            ) : null}
                           </div>
                         );
                       })}
