@@ -9,8 +9,10 @@ import MealCard from "@/components/nutrition/MealCard";
 import HistoryDrawer from "@/components/history/HistoryDrawer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { getLocalDateStr, getLocalDayName } from "@/lib/dateUtils";
+import { Link } from "react-router-dom";
 
 const DEFAULT_PROTEIN_TARGET = 100;
 
@@ -299,6 +301,20 @@ const Dashboard = () => {
             Objetivo de agua: 2-2.5 litros/dia. Priorizar hidratacion por la manana y post-entreno.
             Si experimentas sintomas digestivos severos, consulta a un profesional de salud.
           </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Registro Digestivo</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Registra síntomas para detectar patrones
+          </p>
+          <Link to="/digestion/registro">
+            <Button size="sm" className="min-h-[44px]">Registrar síntomas</Button>
+          </Link>
         </CardContent>
       </Card>
     </div>
