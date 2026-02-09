@@ -32,7 +32,7 @@ const AppLayout = () => {
       <header className="sticky top-0 z-40 border-b border-border bg-card/90 backdrop-blur-sm">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="font-serif text-xl font-bold text-primary tracking-tight">
-            Nutriólogo Pro
+            GutSync
           </h1>
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/suplementos")} title="Suplementos">
