@@ -14,19 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_users: {
+        Row: {
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       consumed_meals: {
         Row: {
           calories: number
           consumed_date: string
           created_at: string
           description: string | null
-          digestion_score: number | null
           id: string
-          ingredients: Json | null
           meal_label: string
-          meal_name: string | null
           meal_time: string | null
-          mood: string | null
           protein: number
           recipe_id: string | null
           user_id: string
@@ -36,13 +47,9 @@ export type Database = {
           consumed_date?: string
           created_at?: string
           description?: string | null
-          digestion_score?: number | null
           id?: string
-          ingredients?: Json | null
           meal_label: string
-          meal_name?: string | null
           meal_time?: string | null
-          mood?: string | null
           protein?: number
           recipe_id?: string | null
           user_id: string
@@ -52,13 +59,9 @@ export type Database = {
           consumed_date?: string
           created_at?: string
           description?: string | null
-          digestion_score?: number | null
           id?: string
-          ingredients?: Json | null
           meal_label?: string
-          meal_name?: string | null
           meal_time?: string | null
-          mood?: string | null
           protein?: number
           recipe_id?: string | null
           user_id?: string
@@ -605,7 +608,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
