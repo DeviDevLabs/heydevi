@@ -20,7 +20,6 @@ const Auth = () => {
       redirect_uri: globalThis.location.origin,
     });
     if (error) {
-      console.log(error)
       toast({ title: "Error con Google", description: error.message, variant: "destructive" });
     }
     setSubmitting(false);

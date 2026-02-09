@@ -6,6 +6,77 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+type DigestiveLog = {
+  severity?: number | null;
+  pain?: number | null;
+  bloating?: number | null;
+  gas?: number | null;
+  reflux?: number | null;
+  urgency?: number | null;
+  bristol?: number | null;
+  stress?: number | null;
+  sleep_hours?: number | null;
+  energy?: number | null;
+};
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+// Base, safe scoring implementation: returns 1..5 (5 = peor digestión)
+const symptomScore = (log: DigestiveLog): number => {
+  const numeric = (value?: number | null) => (typeof value === "number" && !Number.isNaN(value) ? value : null);
+
+  const severity = numeric(log.severity);
+  if (severity !== null) {
+    return clamp(Math.round(severity), 1, 5);
+  }
+
+  const candidates = [
+    numeric(log.pain),
+    numeric(log.bloating),
+    numeric(log.gas),
+    numeric(log.reflux),
+    numeric(log.urgency),
+    numeric(log.stress),
+  ].filter((v): v is number => v !== null);
+
+  if (candidates.length > 0) {
+    const avg = candidates.reduce((s, v) => s + v, 0) / candidates.length;
+    // Assume scale 0..10 -> map to 1..5
+    return clamp(Math.round(avg / 2), 1, 5);
+  }
+
+  const bristol = numeric(log.bristol);
+  if (bristol !== null) {
+    // Ideal 3-4 -> 2, further away -> higher score
+    const distance = Math.abs(bristol - 4);
+    return clamp(2 + distance, 1, 5);
+  }
+
+  return 3;
+};
+
+// Base, safe day weight implementation: returns 0.5..1.2 depending on data completeness
+const dayWeight = (log: DigestiveLog): number => {
+  const numeric = (value?: number | null) => (typeof value === "number" && !Number.isNaN(value) ? value : null);
+  const fields = [
+    numeric(log.severity),
+    numeric(log.pain),
+    numeric(log.bloating),
+    numeric(log.gas),
+    numeric(log.reflux),
+    numeric(log.urgency),
+    numeric(log.bristol),
+    numeric(log.stress),
+    numeric(log.sleep_hours),
+    numeric(log.energy),
+  ];
+  const present = fields.filter((v) => v !== null).length;
+  if (present >= 7) return 1.1;
+  if (present >= 4) return 1.0;
+  if (present >= 2) return 0.85;
+  return 0.7;
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
