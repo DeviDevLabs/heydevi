@@ -1,4 +1,5 @@
 import React from "react";
+// @ts-expect-error - testing-library types not fully installed
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 
