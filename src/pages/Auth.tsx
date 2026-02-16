@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { lovable } from "@/integrations/lovable/index";
+import { supabase } from "@/integrations/supabase/client";
 
 const Auth = () => {
   const { user, loading } = useAuth();
@@ -14,6 +15,8 @@ const Auth = () => {
   if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">Cargando...</p></div>;
   if (user) return <Navigate to="/" replace />;
 
+  const isDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
   const handleGoogleLogin = async () => {
     setSubmitting(true);
     const { error } = await lovable.auth.signInWithOAuth("google", {
@@ -21,6 +24,28 @@ const Auth = () => {
     });
     if (error) {
       toast({ title: "Error con Google", description: error.message, variant: "destructive" });
+    }
+    setSubmitting(false);
+  };
+
+  const handleDevBypass = async () => {
+    setSubmitting(true);
+    const email = "dev@localhost.test";
+    const password = "dev-bypass-local-only";
+    // Try sign in first, then sign up if user doesn't exist
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (signInError) {
+      const { error: signUpError } = await supabase.auth.signUp({ email, password });
+      if (signUpError) {
+        toast({ title: "Error de desarrollo", description: signUpError.message, variant: "destructive" });
+        setSubmitting(false);
+        return;
+      }
+      // Try sign in again after signup
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        toast({ title: "Verifica tu email o habilita auto-confirm", description: error.message, variant: "destructive" });
+      }
     }
     setSubmitting(false);
   };
@@ -58,6 +83,17 @@ const Auth = () => {
                 "Continuar con Google"
               )}
             </Button>
+            {isDev && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full mt-2"
+                disabled={submitting}
+                onClick={handleDevBypass}
+              >
+                🛠 Dev Bypass (localhost only)
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
