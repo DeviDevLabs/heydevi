@@ -2,3 +2,6 @@ project_id = "xcctyhndssbjfmqciwhh"
 
 [functions.digestive-analysis]
 verify_jwt = false
+
+[functions.analyze-meal-photo]
+verify_jwt = false
