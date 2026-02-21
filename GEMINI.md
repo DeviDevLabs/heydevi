@@ -30,6 +30,13 @@ Nutri Companion is a comprehensive health and nutrition management application. 
 - `src/test`: Vitest test suites.
 - `supabase/`: Supabase configuration, migrations, and edge functions.
 
+## AI Collaboration & Architectural Strategy
+### Minimal Schema Changes
+When resolving constraint violations or data edge cases, prefer **frontend-side logic** (e.g., clamping values, validation) over modifying the database schema unless the change is structurally necessary. This keeps the Supabase schema lean and minimizes migration overhead.
+
+### AI Synchronization
+Always prioritize strategies defined in `.lovable/plan.md`. When developing features or fixing bugs, ensure your logic aligns with the architectural direction established by other AI agents to maintain a unified and consistent codebase.
+
 ## Features & Business Logic
 ### Digestive Scoring System
 The application includes a unique `DigestiveScore` calculation (`src/lib/digestiveUtils.ts`) that analyzes recipe ingredients against known irritants (lactose, gluten, high fat, spicy foods, legumes, cruciferous vegetables). It assigns a score from 1 (irritant) to 10 (gentle) and provides descriptive labels like "Muy suave" or "Puede irritar".
