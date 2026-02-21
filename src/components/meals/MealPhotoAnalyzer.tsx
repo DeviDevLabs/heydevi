@@ -50,8 +50,8 @@ const MealPhotoAnalyzer = ({ userId, onMealSaved }: MealPhotoAnalyzerProps) => {
         if (!data?.foods?.length) {
           toast({ title: "Sin resultados", description: "No se pudieron identificar alimentos en la foto." });
         }
-      } catch (err: any) {
-        toast({ title: "Error", description: err?.message ?? "Error analizando imagen", variant: "destructive" });
+      } catch (err) {
+        toast({ title: "Error", description: err instanceof Error ? err.message : "Error analizando imagen", variant: "destructive" });
       } finally {
         setAnalyzing(false);
       }
@@ -89,8 +89,8 @@ const MealPhotoAnalyzer = ({ userId, onMealSaved }: MealPhotoAnalyzerProps) => {
       setFoods([]);
       setPreview(null);
       onMealSaved?.();
-    } catch (err: any) {
-      toast({ title: "Error", description: err?.message ?? "Error guardando comida", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Error", description: err instanceof Error ? err.message : "Error guardando comida", variant: "destructive" });
     } finally {
       setSaving(false);
     }

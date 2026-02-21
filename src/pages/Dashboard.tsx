@@ -74,8 +74,8 @@ const Dashboard = () => {
         }
         if (!mounted) return;
         if (data?.protein_target) setProteinTarget(data.protein_target);
-      } catch (e: any) {
-        toast({ title: "Error", description: e?.message ?? "Error cargando perfil", variant: "destructive" });
+      } catch (e) {
+        toast({ title: "Error", description: e instanceof Error ? e.message : "Error cargando perfil", variant: "destructive" });
       }
     })();
     return () => { mounted = false; };
@@ -141,7 +141,8 @@ const Dashboard = () => {
     // Optimistic update
     setTakenSupIds((prev) => {
       const next = new Set(prev);
-      wasTaken ? next.delete(sup.id) : next.add(sup.id);
+      if (wasTaken) next.delete(sup.id);
+      else next.add(sup.id);
       return next;
     });
 
@@ -163,14 +164,15 @@ const Dashboard = () => {
           );
         if (error) throw error;
       }
-    } catch (e: any) {
+    } catch (e) {
       // Revert optimistic update
       setTakenSupIds((prev) => {
         const next = new Set(prev);
-        wasTaken ? next.add(sup.id) : next.delete(sup.id);
+        if (wasTaken) next.add(sup.id);
+        else next.delete(sup.id);
         return next;
       });
-      toast({ title: "Error", description: e?.message ?? "Error guardando suplemento", variant: "destructive" });
+      toast({ title: "Error", description: e instanceof Error ? e.message : "Error guardando suplemento", variant: "destructive" });
     }
   }, [user, todayStr, takenSupIds, toast]);
 
