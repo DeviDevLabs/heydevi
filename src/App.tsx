@@ -16,6 +16,7 @@ import Inventory from "@/pages/Inventory";
 import DigestiveProfile from "@/pages/DigestiveProfile";
 import DigestiveLog from "@/pages/DigestiveLog";
 import DigestiveStats from "@/pages/DigestiveStats";
+import Biomarkers from "@/pages/Biomarkers";
 import Auth from "@/pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -49,6 +50,7 @@ const AppRoutes = () => (
       <Route path="/digestion" element={<DigestiveProfile />} />
       <Route path="/digestion/registro" element={<DigestiveLog />} />
       <Route path="/digestion/estadisticas" element={<DigestiveStats />} />
+      <Route path="/biomarcadores" element={<Biomarkers />} />
     </Route>
     <Route path="*" element={<NotFound />} />
   </Routes>
