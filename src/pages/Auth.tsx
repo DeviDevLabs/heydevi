@@ -1,21 +1,24 @@
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { lovable } from "@/integrations/lovable/index";
-import { supabase } from "@/integrations/supabase/client";
 
 const Auth = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, signIn, signUp } = useAuth();
   const [submitting, setSubmitting] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [mode, setMode] = useState("signin");
   const { toast } = useToast();
 
   if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">Cargando...</p></div>;
   if (user) return <Navigate to="/" replace />;
-
-  const isDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 
   const handleGoogleLogin = async () => {
     setSubmitting(true);
@@ -28,24 +31,19 @@ const Auth = () => {
     setSubmitting(false);
   };
 
-  const handleDevBypass = async () => {
+  const handleEmailAuth = async (type: "signin" | "signup") => {
+    if (!email || !password) {
+      toast({ title: "Error", description: "Por favor, completa todos los campos", variant: "destructive" });
+      return;
+    }
+
     setSubmitting(true);
-    const email = "dev@localhost.test";
-    const password = "dev-bypass-local-only";
-    // Try sign in first, then sign up if user doesn't exist
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-    if (signInError) {
-      const { error: signUpError } = await supabase.auth.signUp({ email, password });
-      if (signUpError) {
-        toast({ title: "Error de desarrollo", description: signUpError.message, variant: "destructive" });
-        setSubmitting(false);
-        return;
-      }
-      // Try sign in again after signup
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        toast({ title: "Verifica tu email o habilita auto-confirm", description: error.message, variant: "destructive" });
-      }
+    const { error } = type === "signin" ? await signIn(email, password) : await signUp(email, password);
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else if (type === "signup") {
+      toast({ title: "Registro exitoso", description: "Revisa tu correo para confirmar tu cuenta" });
     }
     setSubmitting(false);
   };
@@ -62,38 +60,83 @@ const Auth = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Iniciar sesión</CardTitle>
+            <CardTitle className="text-xl">Bienvenido</CardTitle>
+            <CardDescription>
+              Inicia sesión o regístrate para continuar
+            </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <Tabs value={mode} onValueChange={setMode} className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="signin">Iniciar sesión</TabsTrigger>
+                <TabsTrigger value="signup">Registrarse</TabsTrigger>
+              </TabsList>
+              
+              <div className="mt-4 space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    placeholder="tu@email.com" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={submitting}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Contraseña</Label>
+                  <Input 
+                    id="password" 
+                    type="password" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={submitting}
+                  />
+                </div>
+              </div>
+
+              <TabsContent value="signin" className="mt-4">
+                <Button
+                  type="button"
+                  className="w-full"
+                  disabled={submitting}
+                  onClick={() => handleEmailAuth("signin")}
+                >
+                  {submitting ? "Cargando..." : "Iniciar sesión"}
+                </Button>
+              </TabsContent>
+              
+              <TabsContent value="signup" className="mt-4">
+                <Button
+                  type="button"
+                  className="w-full"
+                  disabled={submitting}
+                  onClick={() => handleEmailAuth("signup")}
+                >
+                  {submitting ? "Cargando..." : "Crear cuenta"}
+                </Button>
+              </TabsContent>
+            </Tabs>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">O también</span>
+              </div>
+            </div>
+
             <Button
               type="button"
+              variant="outline"
               className="w-full"
               disabled={submitting}
               onClick={handleGoogleLogin}
             >
-              {submitting ? (
-                <span className="flex items-center justify-center">
-                  <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden>
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                  </svg>
-                  Procesando...
-                </span>
-              ) : (
-                "Continuar con Google"
-              )}
+              Continuar con Google
             </Button>
-            {isDev && (
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full mt-2"
-                disabled={submitting}
-                onClick={handleDevBypass}
-              >
-                🛠 Dev Bypass (localhost only)
-              </Button>
-            )}
           </CardContent>
         </Card>
       </div>
