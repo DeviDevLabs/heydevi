@@ -7,6 +7,7 @@ const corsHeaders = {
 };
 
 type DigestiveLog = {
+  log_date: string;
   severity?: number | null;
   pain?: number | null;
   bloating?: number | null;

@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import useConsumedMeals from "@/hooks/useConsumedMeals";
 import ProteinBar from "@/components/nutrition/ProteinBar";
 import MealCard from "@/components/nutrition/MealCard";
+import MealPhotoAnalyzer from "@/components/meals/MealPhotoAnalyzer";
 import HistoryDrawer from "@/components/history/HistoryDrawer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -174,7 +175,7 @@ const Dashboard = () => {
   }, [user, todayStr, takenSupIds, toast]);
 
   // consumed meals hook (fetch + optimistic toggle)
-  const { consumedMealIds: consumedFromHook, loading: consumedLoading, toggleMeal } = useConsumedMeals(
+  const { consumedMealIds: consumedFromHook, loading: consumedLoading, toggleMeal, fetchConsumed } = useConsumedMeals(
     user?.id,
     todayStr
   );
@@ -239,6 +240,9 @@ const Dashboard = () => {
 
       <div className="space-y-3">
         <h2 className="font-semibold text-lg">Comidas del dia</h2>
+
+        {user && <MealPhotoAnalyzer userId={user.id} onMealSaved={fetchConsumed} />}
+
         {todayPlan.meals.map((meal, i) => {
           const mealKey = `${meal.time}-${meal.label}`;
           const isConsumed = consumedMealIds.has(mealKey);
