@@ -138,7 +138,7 @@ const DigestiveLog = () => {
         user_id: user.id,
         log_date: viewDate,
         symptom: `bristol-${form.bristol}`,
-        severity: Math.max(form.bloating, form.pain, form.gas, form.reflux, form.urgency),
+        severity: Math.max(1, form.bloating, form.pain, form.gas, form.reflux, form.urgency),
         log_time: form.log_time || null,
         bristol: form.bristol,
         frequency: form.frequency,
