@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { getLocalDateStr, getLocalDayName } from "@/lib/dateUtils";
 import { Link } from "react-router-dom";
+import { Trash2 } from "lucide-react";
 
 const DEFAULT_PROTEIN_TARGET = 100;
 
@@ -177,7 +178,14 @@ const Dashboard = () => {
   }, [user, todayStr, takenSupIds, toast]);
 
   // consumed meals hook (fetch + optimistic toggle)
-  const { consumedMealIds: consumedFromHook, loading: consumedLoading, toggleMeal, fetchConsumed } = useConsumedMeals(
+  const { 
+    consumedMealIds: consumedFromHook, 
+    consumedMeals, 
+    loading: consumedLoading, 
+    toggleMeal, 
+    fetchConsumed,
+    deleteMealById 
+  } = useConsumedMeals(
     user?.id,
     todayStr
   );
@@ -187,13 +195,22 @@ const Dashboard = () => {
     setConsumedMealIds(consumedFromHook);
   }, [consumedFromHook]);
 
-  const consumedProtein = useMemo(
-    () =>
-      todayPlan.meals
-        .filter((m) => consumedMealIds.has(`${m.time}-${m.label}`))
-        .reduce((sum, m) => sum + m.protein, 0),
-    [todayPlan.meals, consumedMealIds]
-  );
+  const extraMeals = useMemo(() => {
+    return consumedMeals.filter(m => {
+      const isPlanned = todayPlan.meals.some(pm => pm.time === m.meal_time && pm.label === m.meal_label);
+      return !isPlanned;
+    });
+  }, [consumedMeals, todayPlan.meals]);
+
+  const consumedProtein = useMemo(() => {
+    const plannedProtein = todayPlan.meals
+      .filter((m) => consumedMealIds.has(`${m.time}-${m.label}`))
+      .reduce((sum, m) => sum + m.protein, 0);
+    
+    const adhocProtein = extraMeals.reduce((sum, m) => sum + (m.protein || 0), 0);
+    
+    return plannedProtein + adhocProtein;
+  }, [todayPlan.meals, consumedMealIds, extraMeals]);
 
   const totalProtein = getDayTotalProtein(todayPlan);
   const totalCalories = getDayTotalCalories(todayPlan);
@@ -261,6 +278,33 @@ const Dashboard = () => {
             </div>
           );
         })}
+
+        {extraMeals.length > 0 && (
+          <div className="space-y-3 pt-2">
+            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Comidas adicionales</h3>
+            {extraMeals.map((meal, i) => (
+              <div key={meal.id || i} className="flex items-start gap-3">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="mt-3 text-muted-foreground hover:text-destructive shrink-0"
+                  onClick={() => deleteMealById(meal.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                <div className="flex-1 opacity-80">
+                  <MealCard meal={{
+                    time: meal.meal_time || "",
+                    label: meal.meal_label || "Ad-hoc",
+                    description: meal.description || "",
+                    protein: meal.protein || 0,
+                    calories: meal.calories || 0,
+                  }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <Card>

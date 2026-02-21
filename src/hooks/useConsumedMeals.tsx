@@ -14,6 +14,7 @@ type MealLike = {
 export function useConsumedMeals(userId?: string | null, date?: string) {
   const { toast } = useToast();
   const [consumedMealIds, setConsumedMealIds] = useState<Set<string>>(new Set());
+  const [consumedMeals, setConsumedMeals] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,7 +25,7 @@ export function useConsumedMeals(userId?: string | null, date?: string) {
     try {
       const { data, error: fetchError } = await supabase
         .from("consumed_meals")
-        .select("meal_label, meal_time")
+        .select("*")
         .eq("user_id", userId)
         .eq("consumed_date", date);
 
@@ -35,6 +36,7 @@ export function useConsumedMeals(userId?: string | null, date?: string) {
       }
 
       if (data) {
+        setConsumedMeals(data);
         setConsumedMealIds(new Set(data.map((m: any) => `${m.meal_time}-${m.meal_label}`)));
       }
     } catch (e: any) {
@@ -116,7 +118,23 @@ export function useConsumedMeals(userId?: string | null, date?: string) {
     [userId, date, toast]
   );
 
-  return { consumedMealIds, loading, error, fetchConsumed, toggleMeal } as const;
+  const deleteMealById = useCallback(async (mealId: string) => {
+    try {
+      const { error: delError } = await supabase
+        .from("consumed_meals")
+        .delete()
+        .eq("id", mealId);
+      
+      if (delError) throw delError;
+      
+      setConsumedMeals((prev) => prev.filter(m => m.id !== mealId));
+      toast({ title: "Comida eliminada" });
+    } catch (e: any) {
+      toast({ title: "Error al eliminar", description: e?.message, variant: "destructive" });
+    }
+  }, [toast]);
+
+  return { consumedMealIds, consumedMeals, loading, error, fetchConsumed, toggleMeal, deleteMealById } as const;
 }
 
 export default useConsumedMeals;
