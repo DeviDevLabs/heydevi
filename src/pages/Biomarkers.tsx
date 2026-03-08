@@ -41,13 +41,8 @@ const Biomarkers = () => {
     if (!user) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("blood_tests")
-        .select("*")
-        .order("test_date", { ascending: false });
-      
-      if (error) throw error;
-      setTests(data || []);
+      // blood_tests table not yet created – skip loading
+      setTests([]);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -90,18 +85,8 @@ const Biomarkers = () => {
     if (!user || !currentResult) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from("blood_tests").insert({
-        user_id: user.id,
-        test_date: currentResult.test_date,
-        test_type: currentResult.test_type,
-        biomarkers: currentResult.biomarkers as any,
-      });
-
-      if (error) throw error;
-      
-      toast({ title: "Guardado", description: "El análisis ha sido registrado en tu historial" });
-      setCurrentResult(null);
-      loadTests();
+      // blood_tests table not yet created – skip saving
+      toast({ title: "No disponible", description: "La tabla de biomarcadores aún no está configurada", variant: "destructive" });
     } catch (err: any) {
       toast({ title: "Error al guardar", description: err.message, variant: "destructive" });
     } finally {
@@ -196,7 +181,7 @@ const Biomarkers = () => {
                     <TableRow key={i} className={isOutOfRange(b) ? "bg-destructive/5" : ""}>
                       <TableCell className="font-medium py-2">
                         {b.item}
-                        {isOutOfRange(b) && <AlertTriangle className="h-3 w-3 text-destructive inline ml-1" title="Fuera de rango" />}
+                        {isOutOfRange(b) && <AlertTriangle className="h-3 w-3 text-destructive inline ml-1" />}
                       </TableCell>
                       <TableCell className={`text-right font-mono py-2 ${isOutOfRange(b) ? "text-destructive font-bold" : ""}`}>
                         {b.value}
