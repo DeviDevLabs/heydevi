@@ -52,6 +52,7 @@ const AppRoutes = () => (
       <Route path="/digestion/registro" element={<DigestiveLog />} />
       <Route path="/digestion/estadisticas" element={<DigestiveStats />} />
       <Route path="/biomarcadores" element={<Biomarkers />} />
+      <Route path="/alimentos-sospechosos" element={<SuspectFoods />} />
     </Route>
     <Route path="*" element={<NotFound />} />
   </Routes>
