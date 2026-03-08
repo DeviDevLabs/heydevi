@@ -85,18 +85,8 @@ const Biomarkers = () => {
     if (!user || !currentResult) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from("blood_tests").insert({
-        user_id: user.id,
-        test_date: currentResult.test_date,
-        test_type: currentResult.test_type,
-        biomarkers: currentResult.biomarkers as any,
-      });
-
-      if (error) throw error;
-      
-      toast({ title: "Guardado", description: "El análisis ha sido registrado en tu historial" });
-      setCurrentResult(null);
-      loadTests();
+      // blood_tests table not yet created – skip saving
+      toast({ title: "No disponible", description: "La tabla de biomarcadores aún no está configurada", variant: "destructive" });
     } catch (err: any) {
       toast({ title: "Error al guardar", description: err.message, variant: "destructive" });
     } finally {
