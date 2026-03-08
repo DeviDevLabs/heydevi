@@ -41,13 +41,8 @@ const Biomarkers = () => {
     if (!user) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("blood_tests")
-        .select("*")
-        .order("test_date", { ascending: false });
-      
-      if (error) throw error;
-      setTests(data || []);
+      // blood_tests table not yet created – skip loading
+      setTests([]);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
