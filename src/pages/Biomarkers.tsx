@@ -181,7 +181,7 @@ const Biomarkers = () => {
                     <TableRow key={i} className={isOutOfRange(b) ? "bg-destructive/5" : ""}>
                       <TableCell className="font-medium py-2">
                         {b.item}
-                        {isOutOfRange(b) && <AlertTriangle className="h-3 w-3 text-destructive inline ml-1" title="Fuera de rango" />}
+                        {isOutOfRange(b) && <AlertTriangle className="h-3 w-3 text-destructive inline ml-1" />}
                       </TableCell>
                       <TableCell className={`text-right font-mono py-2 ${isOutOfRange(b) ? "text-destructive font-bold" : ""}`}>
                         {b.value}
