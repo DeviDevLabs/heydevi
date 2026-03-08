@@ -17,6 +17,7 @@ import DigestiveProfile from "@/pages/DigestiveProfile";
 import DigestiveLog from "@/pages/DigestiveLog";
 import DigestiveStats from "@/pages/DigestiveStats";
 import Biomarkers from "@/pages/Biomarkers";
+import SuspectFoods from "@/pages/SuspectFoods";
 import Auth from "@/pages/Auth";
 import NotFound from "./pages/NotFound";
 
